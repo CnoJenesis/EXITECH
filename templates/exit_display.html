@@ -1,0 +1,37 @@
+<!-- Polling mechanism to supplement Socket.IO -->
+<script>
+    // This function polls the server for updates as a backup mechanism
+    // in case Socket.IO connection fails or misses events
+    function pollForUpdates() {
+        fetch('/api/check-status')
+            .then(response => response.json())
+            .then(data => {
+                if (data.update && data.exit) {
+                    // Format the exit data to match the expected format for handleNewExitLog
+                    const exitData = {
+                        first_name: data.exit.first_name,
+                        middle_initial: data.exit.middle_initial,
+                        last_name: data.exit.last_name,
+                        id_number: data.exit.id_number,
+                        grade_level: data.exit.grade_level,
+                        section: data.exit.section_name,
+                        strand_code: data.exit.strand_code,
+                        status: data.exit.status,
+                        timestamp: data.exit.timestamp,
+                        profile_picture: data.exit.profile_picture
+                    };
+                    
+                    // Use the existing handleNewExitLog function from exit_display.js
+                    if (typeof handleNewExitLog === 'function') {
+                        handleNewExitLog(exitData);
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('Error polling for updates:', error);
+            });
+    }
+
+    // Poll every 10 seconds as a backup to Socket.IO
+    setInterval(pollForUpdates, 10000);
+</script>
