@@ -1,0 +1,17 @@
+# GitHub Pages configuration
+title: EXITECH
+description: School Management System
+baseurl: "/EXITECH"
+
+# Security headers
+webrick:
+  headers:
+    Content-Security-Policy: >-
+      default-src 'self';
+      script-src 'self' 'unsafe-inline' 'unsafe-eval';
+      style-src 'self' 'unsafe-inline';
+      img-src 'self' data: https:;
+      connect-src 'self' https:;
+      font-src 'self';
+      frame-ancestors 'none';
+      form-action 'self'
