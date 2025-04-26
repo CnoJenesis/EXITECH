@@ -8,4 +8,4 @@ Werkzeug==2.0.1
 gunicorn==20.1.0
 python-dotenv==0.19.1
 mysql-connector-python==8.0.28
-https://files.pythonhosted.org/packages/98/3e/ecff3fb9254a1ffe2bd165555a5439c634b9f765b7e71b5558f20d44166c/psycopg2_binary-2.9.3-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
+pg8000==1.29.4

@@ -1,21 +1,17 @@
 """
-PostgreSQL adapter for Vercel deployment.
+PostgreSQL adapter for Vercel deployment using pg8000.
 
 This file will be used in production on Vercel to connect to PostgreSQL
 instead of MySQL. Place it in the root directory of your project.
-
-IMPORTANT: Install psycopg2-binary in your Vercel environment:
-- Make sure to include "psycopg2-binary" in your requirements.txt file
 """
 
 import os
-import psycopg2
-import psycopg2.extras
 import re
+import pg8000
 
 # PostgreSQL adapter for Vercel deployment
 class VercelPostgresAdapter:
-    """Adapter for PostgreSQL on Vercel deployment environment"""
+    """Adapter for PostgreSQL on Vercel deployment environment using pg8000"""
     
     @staticmethod
     def setup():
@@ -48,14 +44,13 @@ class VercelPostgresAdapter:
             
             print(f"Connecting to PostgreSQL at {db_config['host']} with user: {db_config['user']}")
             
-            # Connect to PostgreSQL
-            cls._connection = psycopg2.connect(
-                host=db_config['host'],
-                port=db_config['port'],
+            # Connect to PostgreSQL using pg8000
+            cls._connection = pg8000.connect(
                 user=db_config['user'],
                 password=db_config['password'],
-                database=db_config['database'],
-                sslmode='require'
+                host=db_config['host'],
+                port=int(db_config['port']),
+                database=db_config['database']
             )
             
             print("PostgreSQL connection established")
@@ -69,7 +64,15 @@ class VercelPostgresAdapter:
         @classmethod
         def pg_get_connection(cls):
             try:
-                if cls._connection is None or cls._connection.closed:
+                if cls._connection is None:
+                    cls.initialize()
+                # pg8000 doesn't have a simple is_connected() method, so we'll test with a simple query
+                try:
+                    cursor = cls._connection.cursor()
+                    cursor.execute("SELECT 1")
+                    cursor.close()
+                except Exception:
+                    # If query fails, reinitialize
                     cls.initialize()
                 return cls._connection
             except Exception as e:
@@ -79,21 +82,37 @@ class VercelPostgresAdapter:
         
         Database.get_connection = pg_get_connection
         
-        # Override fetch_one to work with PostgreSQL
+        # Override fetch_one to work with pg8000
         original_fetch_one = Database.fetch_one
         
         def pg_fetch_one(self, query, params=None):
+            connection = self.get_connection()
             cursor = None
             try:
-                connection = self.get_connection()
-                cursor = connection.cursor(cursor_factory=psycopg2.extras.DictCursor)
-                cursor.execute(query, params)
-                result = cursor.fetchone()
+                cursor = connection.cursor()
+                print(f"Executing PG query: {query}")
+                print(f"With parameters: {params}")
                 
-                # Convert result to dict if it exists
-                if result:
-                    return dict(result)
-                return None
+                # Execute the query
+                if params:
+                    cursor.execute(query, params)
+                else:
+                    cursor.execute(query)
+                
+                # Fetch column names
+                column_names = [desc[0] for desc in cursor.description] if cursor.description else []
+                
+                # Fetch the row
+                row = cursor.fetchone()
+                
+                # No results
+                if not row:
+                    return None
+                
+                # Convert to dict
+                result = {column_names[i]: row[i] for i in range(len(column_names))}
+                print(f"Query result: {result}")
+                return result
             except Exception as e:
                 print(f"PostgreSQL error in fetch_one: {e}")
                 return None
@@ -103,19 +122,34 @@ class VercelPostgresAdapter:
         
         Database.fetch_one = pg_fetch_one
         
-        # Override fetch_all to work with PostgreSQL
+        # Override fetch_all to work with pg8000
         original_fetch_all = Database.fetch_all
         
         def pg_fetch_all(self, query, params=None):
+            connection = self.get_connection()
             cursor = None
             try:
-                connection = self.get_connection()
-                cursor = connection.cursor(cursor_factory=psycopg2.extras.DictCursor)
-                cursor.execute(query, params)
-                results = cursor.fetchall()
+                cursor = connection.cursor()
                 
-                # Convert results to dict
-                return [dict(row) for row in results]
+                # Execute the query
+                if params:
+                    cursor.execute(query, params)
+                else:
+                    cursor.execute(query)
+                
+                # Fetch column names
+                column_names = [desc[0] for desc in cursor.description] if cursor.description else []
+                
+                # Fetch all rows
+                rows = cursor.fetchall()
+                
+                # Convert to list of dicts
+                result = []
+                for row in rows:
+                    row_dict = {column_names[i]: row[i] for i in range(len(column_names))}
+                    result.append(row_dict)
+                
+                return result
             except Exception as e:
                 print(f"PostgreSQL error in fetch_all: {e}")
                 return []
@@ -125,7 +159,35 @@ class VercelPostgresAdapter:
         
         Database.fetch_all = pg_fetch_all
         
-        # Override insert to work with PostgreSQL
+        # Override execute to work with pg8000
+        original_execute = Database.execute
+        
+        def pg_execute(self, query, params=None):
+            connection = self.get_connection()
+            cursor = None
+            try:
+                cursor = connection.cursor()
+                
+                # Execute the query
+                if params:
+                    cursor.execute(query, params)
+                else:
+                    cursor.execute(query)
+                
+                connection.commit()
+                return True
+            except Exception as e:
+                print(f"PostgreSQL error in execute: {e}")
+                if connection:
+                    connection.rollback()
+                return False
+            finally:
+                if cursor:
+                    cursor.close()
+        
+        Database.execute = pg_execute
+        
+        # Override insert to work with pg8000
         original_insert = Database.insert
         
         def pg_insert(self, query, params=None):
@@ -140,11 +202,17 @@ class VercelPostgresAdapter:
                     query += " RETURNING id;"
                 
                 cursor = connection.cursor()
-                cursor.execute(query, params)
-                result = cursor.fetchone()
-                connection.commit()
                 
-                # Return the ID from RETURNING clause
+                # Execute the query
+                if params:
+                    cursor.execute(query, params)
+                else:
+                    cursor.execute(query)
+                
+                # Get the ID from RETURNING clause
+                result = cursor.fetchone()
+                
+                connection.commit()
                 return result[0] if result else None
             except Exception as e:
                 print(f"PostgreSQL error in insert: {e}")
@@ -161,7 +229,7 @@ class VercelPostgresAdapter:
         original_close = Database.close
         
         def pg_close(self):
-            if self._connection and not self._connection.closed:
+            if self._connection:
                 self._connection.close()
                 self._connection = None
         
