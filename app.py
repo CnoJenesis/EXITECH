@@ -26,8 +26,16 @@ from config.teams_webhook import TEAMS_WEBHOOK_URL, TEAMS_WEBHOOK_ENABLED
 import logging
 import time
 
+# Load environment variables from .env file if python-dotenv is installed
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+    print("Environment variables loaded from .env file")
+except ImportError:
+    print("python-dotenv not installed, using environment variables from the system")
+
 app = Flask(__name__)
-app.secret_key = APP_CONFIG['secret_key']
+app.secret_key = os.environ.get('SECRET_KEY', APP_CONFIG['secret_key'])
 app.config['UPLOAD_FOLDER'] = os.path.join(os.path.dirname(os.path.abspath(__file__)), APP_CONFIG['upload_folder'])
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
 

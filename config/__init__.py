@@ -1,15 +1,7 @@
 # This file makes the config directory a Python package
 
-DATABASE_CONFIG = {
-    'host': 'localhost',
-    'user': 'root',
-    'password': 'October14?',
-    'database': 'exitech',
-    'auth_plugin': 'mysql_native_password',
-    'charset': 'utf8mb4',
-    'collation': 'utf8mb4_unicode_ci',
-    'raise_on_warnings': True
-}
+# Import database configuration from module
+from .database import DATABASE_CONFIG
 
 # Application configuration
 APP_CONFIG = {
