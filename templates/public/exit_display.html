@@ -1,0 +1,950 @@
+{% extends "base.html" %}
+
+{% block title %}Exit Display{% endblock %}
+
+{% block head %}
+{{ super() }}
+{% endblock %}
+
+{% block content %}
+<!-- Clock positioned outside the main container -->
+<div class="real-time-clock">
+    <div id="clock"></div>
+    <div id="date"></div>
+</div>
+
+<div class="exit-display">
+    <div class="container">
+        <div class="display-wrapper">
+            <div class="main-content">
+                <div id="scan-prompt" class="text-center">
+                    <img src="{{ url_for('static', filename='img/school-logo.png') }}" alt="School Logo" class="school-logo mb-4" style="max-width: 150px;">
+                    <h2 class="scan-title">Please Scan Your ID</h2>
+                    <p class="scan-subtitle">Place your ID card on the scanner to record your exit</p>
+                </div>
+
+                <div class="id-card" style="display: none;">
+                    <div class="text-center">
+                        <img src="{{ url_for('static', filename='img/school-logo.png') }}" alt="School Logo" class="school-logo" style="max-width: 100px; max-height: 80px;">
+                    </div>
+                    <div class="id-content">
+                        <div class="photo-section">
+                            <img id="student-photo" src="{{ url_for('static', filename='img/default-profile.png') }}" alt="Student Photo">
+                        </div>
+                        <div class="info-section">
+                            <div class="info-item">
+                                <div class="id-label">ID NUMBER</div>
+                                <div class="id-value student-id"></div>
+                            </div>
+                            <div class="info-item">
+                                <div class="id-label">NAME</div>
+                                <div class="id-value student-name"></div>
+                            </div>
+                            <div class="info-item">
+                                <div class="id-label">GRADE & SECTION</div>
+                                <div class="id-value student-section"></div>
+                            </div>
+                            <div class="info-item">
+                                <div class="id-label">TIME OF EXIT</div>
+                                <div class="id-value exit-time"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="exit-status-container">
+                        <div class="exit-status allowed"><span class="status-text">ALLOWED</span></div>
+                        <div class="exit-status denied"><span class="status-text">DENIED</span></div>
+                        <div class="status-reason"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Recent Exits Panel -->
+            <div class="recent-exits-panel">
+                <h3 class="panel-title">Recent Exits</h3>
+                <div class="exits-list" id="recent-exits-list">
+                    <!-- Exit items will be populated via JavaScript -->
+                </div>
+            </div>
+        </div>
+        <style>
+            .exit-status-container {
+                text-align: center;
+                margin-top: 20px;
+                padding: 15px;
+                border-radius: 8px;
+            }
+            .exit-status {
+                display: none;
+                font-size: 32px;
+                font-weight: bold;
+                margin-bottom: 10px;
+            }
+            .exit-status.allowed {
+                color: #4CAF50;
+            }
+            .exit-status.denied {
+                color: #FF0000;
+            }
+            .status-reason {
+                font-size: 18px;
+                margin-top: 10px;
+                padding: 5px;
+                font-weight: 500;
+                display: block;
+                min-height: 30px;
+                background-color: rgba(255, 255, 255, 0.8);
+                border-radius: 5px;
+                text-align: center;
+            }
+            .exit-status-container.denied .status-reason {
+                color: #FF0000;
+            }
+            .exit-status-container.allowed .status-reason {
+                color: #4CAF50;
+            }
+            
+            /* Display wrapper for main content and recent exits */
+            .display-wrapper {
+                display: flex;
+                gap: 20px;
+                width: 100%;
+            }
+            
+            /* Main content styles */
+            .main-content {
+                flex: 2;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+            }
+            
+            /* Recent Exits Panel styles */
+            .recent-exits-panel {
+                flex: 1;
+                background-color: white;
+                border-radius: 8px;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+                padding: 15px;
+                max-height: 80vh;
+                display: flex;
+                flex-direction: column;
+                overflow: hidden;
+            }
+            
+            .panel-title {
+                font-size: 1.5rem;
+                color: #002B5B;
+                margin-bottom: 15px;
+                text-align: center;
+                border-bottom: 2px solid #f0f0f0;
+                padding-bottom: 10px;
+                flex-shrink: 0;
+            }
+            
+            .exits-list {
+                display: flex;
+                flex-direction: column;
+                gap: 10px;
+                overflow-y: auto;
+                flex-grow: 1;
+            }
+            
+            .exit-item {
+                display: flex;
+                align-items: center;
+                padding: 15px;
+                margin-bottom: 12px;
+                border-radius: 8px;
+                background-color: #f8f9fa;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                position: relative;
+                overflow: hidden;
+                min-height: 80px;
+                transition: all 0.3s ease;
+            }
+            
+            .exit-item:hover {
+                box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+            }
+            
+            .exit-photo {
+                width: 60px;
+                height: 60px;
+                border-radius: 50%;
+                margin-right: 15px;
+                object-fit: cover;
+                border: 2px solid #e9ecef;
+            }
+            
+            .exit-info {
+                flex: 1;
+                min-width: 0;
+            }
+            
+            .exit-name {
+                font-size: 18px;
+                font-weight: bold;
+                margin-bottom: 4px;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+            
+            .exit-details {
+                display: flex;
+                justify-content: space-between;
+                font-size: 14px;
+                color: #6c757d;
+                margin-right: 90px; /* Make room for the status badge */
+            }
+            
+            .exit-status-badge {
+                position: absolute;
+                top: 50%;
+                right: 15px;
+                transform: translateY(-50%);
+                padding: 6px 12px;
+                border-radius: 20px;
+                font-size: 14px;
+                font-weight: bold;
+                text-transform: uppercase;
+                background-color: #28a745;
+                color: white;
+                min-width: 80px;
+                text-align: center;
+            }
+            
+            .exit-status-badge.denied {
+                background-color: #dc3545;
+            }
+            
+            /* Enhanced animation for new entries */
+            @keyframes highlight {
+                0% { 
+                    background-color: rgba(76, 175, 80, 0.5); 
+                    transform: scale(1.05);
+                    box-shadow: 0 0 15px rgba(76, 175, 80, 0.8);
+                }
+                15% { 
+                    background-color: rgba(76, 175, 80, 0.4);
+                    transform: scale(1.03);
+                    box-shadow: 0 0 10px rgba(76, 175, 80, 0.5);
+                }
+                100% { 
+                    background-color: #f8f9fa; 
+                    transform: scale(1);
+                    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                }
+            }
+            
+            .exit-item.new {
+                animation: highlight 3s ease-out;
+            }
+
+            #recent-exits-list {
+                max-height: 90vh;
+                overflow-y: auto;
+                padding: 15px;
+            }
+            
+            .exit-time {
+                font-weight: 500;
+                color: #495057;
+            }
+            
+            /* Clock styles */
+            .real-time-clock {
+                position: fixed;
+                top: 20px;
+                left: 30px;
+                text-align: left;
+                padding: 10px;
+                font-family: 'Arial', sans-serif;
+                z-index: 100;
+                background: rgba(255, 255, 255, 0.8);
+                border-radius: 8px;
+                box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+                width: auto;
+            }
+            
+            #clock {
+                font-size: 2.5rem;
+                font-weight: bold;
+                color: #002B5B;
+            }
+            
+            #date {
+                font-size: 1.2rem;
+                color: #444;
+            }
+            
+            /* Make the container have position relative for absolute positioning */
+            .exit-display .container {
+                position: relative;
+                padding-top: 20px;
+            }
+            
+            @media (max-width: 992px) {
+                .display-wrapper {
+                    flex-direction: column;
+                }
+                
+                .recent-exits-panel {
+                    max-height: 300px;
+                }
+            }
+            
+            @media (max-width: 768px) {
+                #clock {
+                    font-size: 2rem;
+                }
+                #date {
+                    font-size: 1rem;
+                }
+                .real-time-clock {
+                    position: fixed;
+                    top: 10px;
+                    left: 10px;
+                    padding: 5px;
+                    width: auto;
+                    max-width: 40%;
+                }
+            }
+            
+            @media (max-width: 480px) {
+                .real-time-clock {
+                    position: fixed;
+                    top: 5px;
+                    left: 5px;
+                    padding: 3px;
+                    background: rgba(255, 255, 255, 0.9);
+                }
+                #clock {
+                    font-size: 1.5rem;
+                }
+                #date {
+                    font-size: 0.8rem;
+                }
+            }
+        </style>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// RFID Scanning Logic
+let rfidInput = '';
+const rfidTimeout = 100;
+let lastKeyTime = Date.now();
+
+// Track current display timeout to allow cancellation
+let currentDisplayTimeout = null;
+
+// Clock function
+function updateClock() {
+    const now = new Date();
+    const timeString = now.toLocaleTimeString('en-US', { 
+        hour: '2-digit', 
+        minute: '2-digit', 
+        second: '2-digit',
+        hour12: true 
+    });
+    const dateString = now.toLocaleDateString('en-US', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+    });
+    
+    document.getElementById('clock').textContent = timeString;
+    document.getElementById('date').textContent = dateString;
+}
+
+// Update clock every second
+setInterval(updateClock, 1000);
+updateClock(); // Initial update
+
+// Simple formatter functions
+function formatName(firstName, middleInitial, lastName) {
+    let name = firstName || '';
+    if (middleInitial) name += ` ${middleInitial}.`;
+    if (lastName) name += ` ${lastName}`;
+    return name.trim() || 'Unknown';
+}
+
+function formatTimestamp(timestamp) {
+    if (!timestamp) return new Date().toLocaleString();
+    try {
+        // Attempt to parse the timestamp
+        let date;
+        if (typeof timestamp === 'string') {
+            // Check if it's in MySQL/ISO format
+            if (timestamp.includes('T') || timestamp.includes('-')) {
+                date = new Date(timestamp);
+            } else {
+                // Try to parse numeric timestamp
+                date = new Date(parseInt(timestamp));
+            }
+        } else {
+            date = new Date(timestamp);
+        }
+        
+        // Verify it's a valid date
+        if (!isNaN(date.getTime())) {
+            // Use 24-hour format for consistency
+            return date.toLocaleString('en-US', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: true
+            });
+        }
+        
+        // If we couldn't parse it properly, return as is
+        return String(timestamp);
+    } catch (e) {
+        console.error('Error formatting timestamp:', e, timestamp);
+        return String(timestamp);
+    }
+}
+
+// Display student information
+function displayStudentInfo(student) {
+    console.log('Displaying student info:', student);
+    
+    // Clear any pending display reset timeout
+    if (currentDisplayTimeout) {
+        clearTimeout(currentDisplayTimeout);
+        currentDisplayTimeout = null;
+    }
+    
+    // Hide the scan prompt and show the ID card
+    document.getElementById('scan-prompt').style.display = 'none';
+    document.querySelector('.id-card').style.display = 'block';
+    
+    // Set student photo (with default if missing)
+    let photoUrl = student.profile_picture || '/static/img/default-profile.png';
+    
+    // Make sure the photo URL is valid
+    if (photoUrl && !photoUrl.startsWith('/static/') && !photoUrl.startsWith('http')) {
+        photoUrl = '/static/uploads/students/' + photoUrl;
+    }
+    
+    document.getElementById('student-photo').src = photoUrl;
+    
+    // Set student information
+    document.querySelector('.student-name').textContent = formatName(student.first_name, student.middle_initial, student.last_name);
+    document.querySelector('.student-id').textContent = student.id_number || 'Unknown';
+    document.querySelector('.student-section').textContent = 
+        `${student.strand_code || ''} ${student.grade_level || ''} - ${student.section || 'Unknown Section'}`.trim();
+    document.querySelector('.exit-time').textContent = formatTimestamp(new Date());
+    
+    // Only reset the status styles if this is not a continuation of processing
+    // (checking for "Please wait..." prevents status reset during processing)
+    const statusReason = document.querySelector('.status-reason');
+    const isProcessing = statusReason && statusReason.textContent === 'Please wait...';
+    
+    if (!isProcessing) {
+        // Reset status display (hide both status elements)
+        const container = document.querySelector('.exit-status-container');
+        container.classList.remove('allowed', 'denied');
+        document.querySelector('.exit-status.allowed').style.display = 'none';
+        document.querySelector('.exit-status.denied').style.display = 'none';
+        document.querySelector('.status-reason').textContent = '';
+    }
+    
+    // If this is just a processing state, show minimal info without changing status
+    if (student.reason === 'Please wait...') {
+        document.querySelector('.status-reason').textContent = 'Please wait...';
+        return; // Don't set a status or timeout yet
+    }
+    
+    // Set status and styling based on exit_status
+    const status = (student.exit_status || '').toUpperCase();
+    const container = document.querySelector('.exit-status-container');
+    
+    if (status === 'ALLOWED') {
+        container.classList.add('allowed');
+        document.querySelector('.exit-status.allowed').style.display = 'block';
+        document.querySelector('.status-text').textContent = 'ALLOWED';
+        document.querySelector('.status-reason').textContent = student.reason || 'No active classes';
+    } else {
+        container.classList.add('denied');
+        document.querySelector('.exit-status.denied').style.display = 'block';
+        document.querySelector('.status-text').textContent = 'DENIED';
+        document.querySelector('.status-reason').textContent = student.reason || 'Access denied';
+    }
+    
+    // Reset display after 5 seconds for final states only (not processing)
+    currentDisplayTimeout = setTimeout(function() {
+        document.querySelector('.id-card').style.display = 'none';
+        document.getElementById('scan-prompt').style.display = 'block';
+        currentDisplayTimeout = null;
+    }, 5000);
+}
+
+// Display access denied
+function displayError(message) {
+    displayStudentInfo({
+        first_name: 'Access',
+        last_name: 'Denied',
+        id_number: 'N/A',
+        exit_status: 'DENIED',
+        reason: message || 'Access denied'
+    });
+}
+
+// Process RFID input
+function processRfid(rfid) {
+    console.log("Processing RFID:", rfid);
+    
+    // Validate RFID format
+    if (!rfid || rfid.length < 8) {
+        console.error("Invalid RFID format:", rfid);
+        displayError("Invalid ID format");
+        return;
+    }
+    
+    // Show loading state in a way that won't flash - don't show status yet
+    const processingElement = document.querySelector('.status-reason');
+    if (processingElement) {
+        processingElement.textContent = 'Please wait...';
+    }
+    
+    // Send request to server
+    fetch('/process_exit', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ rfid_uid: rfid.trim() })
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`Server error: ${response.status}`);
+        }
+        return response.json();
+    })
+    .then(data => {
+        console.log("Server response:", data);
+        
+        if (data.status === 'success' && data.student) {
+            // Display student info immediately
+            displayStudentInfo(data.student);
+            
+            // After processing an exit, always reload the exit logs
+            setTimeout(() => {
+                loadRecentExits();
+            }, 1000);
+        } else {
+            displayError(data.message || "Access denied");
+        }
+    })
+    .catch(error => {
+        console.error("Error processing RFID:", error);
+        displayError("Network error occurred");
+    });
+}
+
+// Set up RFID keypress listener
+document.addEventListener('keydown', function(event) {
+    const currentTime = Date.now();
+    
+    // Reset if too much time has passed since last keypress
+    if (currentTime - lastKeyTime > rfidTimeout) {
+        rfidInput = '';
+    }
+    
+    lastKeyTime = currentTime;
+    
+    if (event.key !== 'Enter') {
+        rfidInput += event.key;
+        console.log("Building RFID input:", rfidInput);
+    } else {
+        console.log("Enter pressed. Final RFID:", rfidInput);
+        if (rfidInput.length >= 8) {
+            processRfid(rfidInput);
+        } else {
+            console.error("RFID input too short:", rfidInput);
+        }
+        rfidInput = '';
+    }
+});
+
+// Cache exit logs to localStorage for faster initial loading
+function cacheExitLogs(exitLogs) {
+    try {
+        const logsToCache = Array.isArray(exitLogs) ? exitLogs : [exitLogs];
+        localStorage.setItem('exitLogs', JSON.stringify(logsToCache.slice(0, 20)));
+        console.log(`Cached ${logsToCache.length} exit logs to localStorage`);
+    } catch (error) {
+        console.error('Error caching exit logs:', error);
+    }
+}
+
+// Load cached exit logs from localStorage
+function loadCachedExitLogs() {
+    try {
+        const cachedLogs = JSON.parse(localStorage.getItem('exitLogs') || '[]');
+        if (cachedLogs.length > 0) {
+            console.log(`Loaded ${cachedLogs.length} cached exit logs`);
+            displayExitLogs(cachedLogs);
+        }
+        return cachedLogs;
+    } catch (error) {
+        console.error('Error loading cached exit logs:', error);
+        return [];
+    }
+}
+
+// Load recent exits for the sidebar
+function loadRecentExits() {
+    console.log("Loading recent exits from server");
+    
+    // Force bypass cache with stronger approach
+    const freshParams = `nocache=${Date.now()}-${Math.random().toString(36).substring(2, 15)}`;
+    
+    fetch(`/api/recent-exits?${freshParams}`, {
+        headers: {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0'
+        }
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`Network error: ${response.status}`);
+        }
+        return response.json();
+    })
+    .then(data => {
+        console.log(`Received exit logs from server:`, data);
+        
+        // Check if data is valid array
+        if (Array.isArray(data) && data.length > 0) {
+            console.log(`Displaying ${data.length} exit logs from database`);
+            displayExitLogs(data);
+            cacheExitLogs(data);
+        } else {
+            console.warn('Received empty or invalid exit logs data:', data);
+            document.getElementById('recent-exits-list').innerHTML = '<div class="text-center p-3">No recent exits found</div>';
+        }
+    })
+    .catch(error => {
+        console.error('Error loading exits:', error);
+        // Try to use cached data if server request fails
+        const cachedLogs = loadCachedExitLogs();
+        if (cachedLogs.length === 0) {
+            document.getElementById('recent-exits-list').innerHTML = 
+                '<div class="text-center p-3">Could not load exit logs. Please refresh the page.</div>';
+        }
+    });
+}
+
+// Set up Socket.IO for real-time updates
+function setupSocketConnection() {
+    console.log("Setting up Socket.IO connection for real-time updates");
+    
+    if (typeof io !== 'function') {
+        console.error("Socket.IO not available - exit logs will not update in real-time");
+        // Add fallback for when Socket.IO is not available
+        setInterval(loadRecentExits, 5000); // Poll every 5 seconds as fallback
+        return;
+    }
+    
+    try {
+        // Create socket connection with debug output
+        console.log("Creating Socket.IO connection...");
+        const socket = io.connect(window.location.origin, {
+            reconnectionDelayMax: 10000,
+            reconnectionAttempts: 10,
+            timeout: 20000,
+            transports: ['websocket', 'polling'] // Try WebSocket first, then polling
+        });
+        
+        // Store socket in window object for debugging
+        window.exitSocket = socket;
+        
+        // Connection events with debug output
+        socket.on('connect', function() {
+            console.log('EXIT DISPLAY: Socket.IO connected successfully! Connection ID:', socket.id);
+            socket.emit('test_connection');
+            
+            // Load initial data when connected
+            loadRecentExits();
+        });
+        
+        socket.on('disconnect', function(reason) {
+            console.log('EXIT DISPLAY: Socket.IO disconnected - Reason:', reason);
+            // Set up a fallback to reload data if socket is disconnected
+            setTimeout(loadRecentExits, 3000);
+        });
+        
+        socket.on('reconnect', function(attemptNumber) {
+            console.log(`EXIT DISPLAY: Socket.IO reconnected after ${attemptNumber} attempts`);
+            // Reload all exit logs to ensure we're up to date after reconnection
+            loadRecentExits();
+        });
+        
+        socket.on('reconnect_error', function(error) {
+            console.error('EXIT DISPLAY: Socket.IO reconnection error:', error);
+            // Add fallback for reconnection errors
+            setTimeout(loadRecentExits, 5000);
+        });
+        
+        // New exit event with proper debugging
+        socket.on('new_exit_log', function(data) {
+            console.log('EXIT DISPLAY: NEW EXIT LOG RECEIVED VIA SOCKET:', data);
+            if (data) {
+                // Add the new exit to the top of the list without reloading everything
+                addNewExitLog(data);
+                // Play notification sound for new exit
+                playNotificationSound();
+            } else {
+                console.error('EXIT DISPLAY: Received empty exit log data');
+            }
+        });
+        
+        // Initial exits event 
+        socket.on('initial_exits', function(data) {
+            console.log('EXIT DISPLAY: Received initial exit logs:', data);
+            if (Array.isArray(data) && data.length > 0) {
+                displayExitLogs(data);
+                cacheExitLogs(data);
+            }
+        });
+        
+        // Test response handling
+        socket.on('test_response', function(data) {
+            console.log('EXIT DISPLAY: Received test response from server:', data);
+        });
+        
+        // Error handling
+        socket.on('error', function(error) {
+            console.error('EXIT DISPLAY: Socket.IO error:', error);
+            // Add fallback for socket errors
+            setTimeout(loadRecentExits, 5000);
+        });
+        
+        socket.on('connect_error', function(error) {
+            console.error('EXIT DISPLAY: Socket.IO connection error:', error);
+            // Add fallback for connection errors
+            setTimeout(loadRecentExits, 5000);
+        });
+        
+        // Set up a heartbeat to keep the connection alive
+        setInterval(function() {
+            if (socket.connected) {
+                socket.emit('test_connection');
+                console.log('EXIT DISPLAY: Sent heartbeat to server');
+            } else {
+                console.warn('EXIT DISPLAY: Socket disconnected, attempting to reconnect...');
+                socket.connect();
+            }
+        }, 30000); // Send heartbeat every 30 seconds
+        
+    } catch (error) {
+        console.error('EXIT DISPLAY: Socket.IO initialization error:', error);
+        // Add fallback for initialization errors
+        setInterval(loadRecentExits, 10000);
+    }
+}
+
+// Play notification sound for new exits
+function playNotificationSound() {
+    try {
+        const audio = new Audio('/static/sounds/notification.mp3');
+        audio.volume = 0.5;
+        audio.play().catch(e => console.log('Sound play prevented by browser policy:', e));
+    } catch (error) {
+        console.log('Sound notification not supported:', error);
+    }
+}
+
+// Add a new exit log to the display (for real-time updates)
+function addNewExitLog(exitLog) {
+    console.log('EXIT DISPLAY: Adding new exit log to display:', exitLog);
+    
+    const container = document.getElementById('recent-exits-list');
+    if (!container) {
+        console.error('EXIT DISPLAY: Could not find recent-exits-list container');
+        return;
+    }
+    
+    // Create exit item element
+    const exitItem = document.createElement('div');
+    exitItem.className = `exit-item ${(exitLog.status || '').toLowerCase() === 'allowed' ? '' : 'denied'}`;
+    exitItem.classList.add('new-exit'); // Add highlight class
+    
+    // Format time
+    const formattedTime = formatTimestamp(exitLog.exit_time);
+    
+    // Fix profile picture path to ensure it's a valid URL
+    let profilePicture = '/static/img/default-profile.png';
+    if (exitLog.profile_picture) {
+        // Check if it's already a full path starting with /static or http
+        if (exitLog.profile_picture.startsWith('/static/') || 
+            exitLog.profile_picture.startsWith('http://') || 
+            exitLog.profile_picture.startsWith('https://')) {
+            profilePicture = exitLog.profile_picture;
+        } else {
+            // Otherwise, assume it needs the static path prefix
+            profilePicture = '/static/uploads/students/' + exitLog.profile_picture;
+        }
+    }
+    
+    // Create HTML content
+    exitItem.innerHTML = `
+        <img src="${profilePicture}" alt="${exitLog.student_name || 'Student'}" class="exit-photo">
+        <div class="exit-info">
+            <div class="exit-name">${exitLog.student_name || ''}</div>
+            <div class="exit-details">
+                <span>${exitLog.id_number || ''} • ${exitLog.grade_section || ''}</span>
+                <span class="exit-time">${formattedTime}</span>
+            </div>
+        </div>
+        <div class="exit-status-badge ${(exitLog.status || '').toLowerCase() === 'allowed' ? '' : 'denied'}">
+            ${exitLog.status || 'UNKNOWN'}
+        </div>
+    `;
+    
+    // Insert at top of list
+    if (container.firstChild) {
+        container.insertBefore(exitItem, container.firstChild);
+    } else {
+        container.appendChild(exitItem);
+    }
+    
+    // Remove highlight after animation
+    setTimeout(() => {
+        exitItem.classList.remove('new-exit');
+    }, 3000);
+    
+    // Trim list to keep only most recent 20 items
+    const items = container.querySelectorAll('.exit-item');
+    if (items.length > 20) {
+        for (let i = 20; i < items.length; i++) {
+            if (items[i].parentNode) {
+                items[i].parentNode.removeChild(items[i]);
+            }
+        }
+    }
+    
+    // Update cache with new exit
+    try {
+        const cachedLogs = JSON.parse(localStorage.getItem('exitLogs') || '[]');
+        cachedLogs.unshift(exitLog);
+        localStorage.setItem('exitLogs', JSON.stringify(cachedLogs.slice(0, 20)));
+        console.log('EXIT DISPLAY: Updated cached exit logs');
+    } catch (error) {
+        console.error('EXIT DISPLAY: Error updating cached exit logs:', error);
+    }
+}
+
+// Display exit logs in the sidebar
+function displayExitLogs(exitLogs) {
+    const container = document.getElementById('recent-exits-list');
+    
+    // Clear existing exits
+    container.innerHTML = '';
+    
+    // Handle empty data
+    if (!exitLogs || exitLogs.length === 0) {
+        container.innerHTML = '<div class="text-center p-3">No recent exits</div>';
+        return;
+    }
+    
+    // Add each exit log
+    exitLogs.forEach(function(log) {
+        const exitItem = document.createElement('div');
+        exitItem.className = `exit-item ${(log.status || '').toLowerCase() === 'allowed' ? '' : 'denied'}`;
+        
+        // Format time
+        const formattedTime = formatTimestamp(log.exit_time);
+        
+        // Fix profile picture path to ensure it's a valid URL
+        let profilePicture = '/static/img/default-profile.png';
+        if (log.profile_picture) {
+            // Check if it's already a full path starting with /static or http
+            if (log.profile_picture.startsWith('/static/') || 
+                log.profile_picture.startsWith('http://') || 
+                log.profile_picture.startsWith('https://')) {
+                profilePicture = log.profile_picture;
+            } else {
+                // Otherwise, assume it needs the static path prefix
+                profilePicture = '/static/uploads/students/' + log.profile_picture;
+            }
+        }
+        
+        // Create HTML content
+        exitItem.innerHTML = `
+            <img src="${profilePicture}" alt="${log.student_name || 'Student'}" class="exit-photo">
+            <div class="exit-info">
+                <div class="exit-name">${log.student_name || ''}</div>
+                <div class="exit-details">
+                    <span>${log.id_number || ''} • ${log.grade_section || ''}</span>
+                    <span class="exit-time">${formattedTime}</span>
+                </div>
+            </div>
+            <div class="exit-status-badge ${(log.status || '').toLowerCase() === 'allowed' ? '' : 'denied'}">
+                ${log.status || 'UNKNOWN'}
+            </div>
+        `;
+        
+        container.appendChild(exitItem);
+    });
+}
+
+// Initialize the page
+function initializePage() {
+    console.log("Initializing exit display page");
+    
+    // First try to load cached exit logs for immediate display
+    loadCachedExitLogs();
+    
+    // Then load fresh exit logs from server
+    loadRecentExits();
+    
+    // Set up Socket.IO for real-time updates
+    setupSocketConnection();
+    
+    // Add highlight animation style
+    const style = document.createElement('style');
+    style.textContent = `
+        @keyframes highlightNewExit {
+            0% { 
+                background-color: rgba(76, 175, 80, 0.5); 
+                transform: scale(1.05);
+                box-shadow: 0 0 15px rgba(76, 175, 80, 0.8);
+            }
+            15% { 
+                background-color: rgba(76, 175, 80, 0.4);
+                transform: scale(1.03);
+                box-shadow: 0 0 10px rgba(76, 175, 80, 0.5);
+            }
+            100% { 
+                background-color: #f8f9fa; 
+                transform: scale(1);
+                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            }
+        }
+        
+        .new-exit {
+            animation: highlightNewExit 3s ease-out;
+        }
+    `;
+    document.head.appendChild(style);
+    
+    // Fallback: refresh exits periodically (every 30 seconds)
+    setInterval(loadRecentExits, 30000);
+}
+
+// Start when document is ready
+document.addEventListener('DOMContentLoaded', initializePage);
+</script>
+{% endblock %}

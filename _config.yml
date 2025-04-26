@@ -1,0 +1,3 @@
+webrick:
+  headers:
+    Content-Security-Policy: "default-src 'self' 'unsafe-inline' 'unsafe-eval'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline';"

@@ -1,0 +1,1310 @@
+{% extends "admin/layout.html" %}
+
+{% block title %}Class Schedules{% endblock %}
+
+{% block styles %}
+<style>
+    /* Schedule styles */
+    table.timetable {
+        width: 100%;
+        border-collapse: collapse;
+    }
+    
+    table.timetable th, table.timetable td {
+        border: 1px solid #ddd;
+        padding: 8px;
+        text-align: center;
+    }
+    
+    table.timetable th {
+        background-color: #f4f4f4;
+    }
+    
+    table.timetable td.time-slot {
+        width: 100px;
+        font-weight: bold;
+        background-color: #f8f8f8;
+    }
+    
+    .schedule-item {
+        background-color: #e9f7fd;
+        border-radius: 4px;
+        padding: 5px;
+        margin-bottom: 2px;
+        position: relative;
+    }
+    
+    .schedule-item .subject {
+        font-weight: bold;
+    }
+    
+    .schedule-item .teacher {
+        font-size: 0.9em;
+    }
+    
+    .schedule-actions {
+        margin-top: 5px;
+    }
+
+    /* New Subject/Teacher Button styles */
+    .input-group-append .btn {
+        border-top-left-radius: 0;
+        border-bottom-left-radius: 0;
+    }
+    
+    .input-group {
+        display: flex;
+        flex-wrap: nowrap;
+    }
+    
+    .input-group-append {
+        display: flex;
+    }
+    
+    /* Make sure the New buttons have consistent styling */
+    .btn-success.btn-add {
+        background-color: #28a745;
+        border-color: #28a745;
+        color: white;
+    }
+    
+    .btn-success.btn-add:hover {
+        background-color: #218838;
+        border-color: #1e7e34;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Class Schedules</h3>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <!-- Grade Level Dropdown -->
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label>Grade Level</label>
+                                <select class="form-control" id="gradeLevel">
+                                    <option value="">Select Grade Level</option>
+                                    {% for grade in grade_levels %}
+                                    <option value="{{ grade }}">{{ grade }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Strand Dropdown -->
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label>Strand</label>
+                                <select class="form-control" id="strand">
+                                    <option value="">Select Strand</option>
+                                    {% for strand in strands %}
+                                    <option value="{{ strand.strand_id }}">{{ strand.strand_name }} ({{ strand.strand_code }})</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Section Dropdown -->
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label>Section</label>
+                                <select class="form-control" id="section" disabled>
+                                    <option value="">Select Section</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Schedule Table will be loaded here -->
+                    <div id="scheduleTable" class="mt-4">
+                        <p class="text-center text-muted">Please select grade level, strand, and section to view schedule</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add/Edit Schedule Modal -->
+<div class="modal fade" id="scheduleModal" tabindex="-1" role="dialog">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="scheduleModalTitle">Add Schedule</h5>
+                <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="scheduleForm">
+                    <input type="hidden" id="scheduleId" name="scheduleId">
+                    <input type="hidden" id="sectionId" name="sectionId">
+                    
+                    <div class="form-group">
+                        <label for="subject">Subject</label>
+                        <div class="input-group">
+                            <select class="form-control" id="subject" name="subject" required>
+                                <option value="">Select Subject</option>
+                                <!-- Will be populated via AJAX -->
+                            </select>
+                            <div class="input-group-append">
+                                <button type="button" class="btn btn-success btn-add" id="addSubjectBtn">
+                                    <i class="fas fa-plus"></i> New
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="teacher">Teacher</label>
+                        <div class="input-group">
+                            <select class="form-control" id="teacher" name="teacher" required>
+                                <option value="">Select Teacher</option>
+                                <!-- Will be populated via AJAX -->
+                            </select>
+                            <div class="input-group-append">
+                                <button type="button" class="btn btn-success btn-add" id="addTeacherBtn">
+                                    <i class="fas fa-plus"></i> New
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="dayOfWeek">Day</label>
+                        <select class="form-control" id="dayOfWeek" name="dayOfWeek" required>
+                            <option value="">Select Day</option>
+                            <option value="MONDAY">MONDAY</option>
+                            <option value="TUESDAY">TUESDAY</option>
+                            <option value="WEDNESDAY">WEDNESDAY</option>
+                            <option value="THURSDAY">THURSDAY</option>
+                            <option value="FRIDAY">FRIDAY</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group col-md-6">
+                            <label for="timeStart">Start Time</label>
+                            <input type="time" class="form-control" id="timeStart" name="timeStart" required>
+                        </div>
+                        <div class="form-group col-md-6">
+                            <label for="timeEnd">End Time</label>
+                            <input type="time" class="form-control" id="timeEnd" name="timeEnd" required>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="saveSchedule">Save</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Subject Modal -->
+<div class="modal fade" id="addSubjectModal" tabindex="-1" role="dialog">
+    <div class="modal-dialog modal-sm" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Add New Subject</h5>
+                <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="addSubjectForm">
+                    <div class="form-group">
+                        <label for="subjectCode">Subject Code</label>
+                        <input type="text" class="form-control" id="subjectCode" name="subjectCode" required style="text-transform: uppercase;">
+                    </div>
+                    <div class="form-group">
+                        <label for="subjectName">Subject Name</label>
+                        <input type="text" class="form-control" id="subjectName" name="subjectName" required style="text-transform: uppercase;">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-success" id="saveSubject">Save Subject</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Teacher Modal -->
+<div class="modal fade" id="addTeacherModal" tabindex="-1" role="dialog">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Add New Teacher</h5>
+                <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="addTeacherForm">
+                    <div class="form-group">
+                        <label for="teacherFirstName">First Name</label>
+                        <input type="text" class="form-control" id="teacherFirstName" name="teacherFirstName" required style="text-transform: uppercase;">
+                    </div>
+                    <div class="form-group">
+                        <label for="teacherMiddleInitial">Middle Initial</label>
+                        <input type="text" class="form-control" id="teacherMiddleInitial" name="teacherMiddleInitial" maxlength="1" style="text-transform: uppercase;">
+                    </div>
+                    <div class="form-group">
+                        <label for="teacherLastName">Last Name</label>
+                        <input type="text" class="form-control" id="teacherLastName" name="teacherLastName" required style="text-transform: uppercase;">
+                    </div>
+                    <div class="form-group">
+                        <label for="teacherEmail">Email</label>
+                        <input type="email" class="form-control" id="teacherEmail" name="teacherEmail">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-success" id="saveTeacher">Save Teacher</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+$(document).ready(function() {
+    console.log("Document ready - initializing schedules page");
+    
+    // Initialize strand dropdown (always available)
+    $('#strand').prop('disabled', false);
+    
+    // Update strands when grade level changes - no longer needed since strands are always available
+    $('#gradeLevel').change(function() {
+        const gradeLevel = $(this).val();
+        console.log(`Grade level changed to: ${gradeLevel}`);
+        
+        // Reset section dropdown when grade level changes
+        $('#section').empty().append('<option value="">Select Section</option>').prop('disabled', true);
+        $('#scheduleTable').html('<p class="text-center text-muted">Please select strand and section to view schedule</p>');
+    });
+
+    // Update sections when strand changes or grade level changes
+    $('#strand, #gradeLevel').change(function() {
+        const strandId = $('#strand').val();
+        const gradeLevel = $('#gradeLevel').val();
+        console.log(`Selection changed - Strand: ${strandId}, Grade: ${gradeLevel}`);
+        
+        if (strandId && gradeLevel) {
+            updateSections(strandId);
+        } else {
+            // If either is empty, disable section dropdown
+            $('#section').empty().append('<option value="">Select Section</option>').prop('disabled', true);
+        }
+    });
+
+    // Load schedule when section changes
+    $('#section').change(function() {
+        const sectionId = $(this).val();
+        console.log(`Section changed to: ${sectionId}`);
+        if (sectionId) {
+            loadTimetable(sectionId);
+        } else {
+            $('#scheduleTable').html('<p class="text-center text-muted">Please select a section to view schedule</p>');
+        }
+    });
+    
+    // Removing View Timetable button click handler since timetable is default
+    // $('#viewTimetableBtn').click(function() {
+    //     const sectionId = $('#section').val();
+    //     if (sectionId) {
+    //         loadTimetable(sectionId);
+    //     }
+    // });
+
+    // Additional initialization to ensure modal behavior is correct
+    $('#scheduleModal').on('hidden.bs.modal', function () {
+        console.log('Modal was closed');
+        // Reset form when modal is closed
+        $('#scheduleForm')[0].reset();
+    });
+    
+    // Fix for cancel button and close button (x)
+    $(document).on('click', '.modal .close, .modal .btn-secondary', function() {
+        console.log('Close/Cancel button clicked');
+        
+        // Get the modal ID from the button's closest modal parent
+        const modalId = $(this).closest('.modal').attr('id');
+        console.log(`Closing modal: ${modalId}`);
+        
+        // Use Bootstrap 5 Modal API to close the modal
+        if (modalId) {
+            const modalElement = document.getElementById(modalId);
+            if (modalElement) {
+                const modalInstance = bootstrap.Modal.getInstance(modalElement);
+                if (modalInstance) {
+                    modalInstance.hide();
+                }
+            }
+        }
+    });
+    
+    // Handle Add Subject button click
+    $('#addSubjectBtn').on('click', function() {
+        // Open Add Subject Modal
+        $('#addSubjectForm')[0].reset();
+        $('#addSubjectModal').modal('show');
+    });
+    
+    // Handle Save Subject button click
+    $('#saveSubject').on('click', function() {
+        // Get form data
+        const subjectCode = $('#subjectCode').val().toUpperCase();
+        const subjectName = $('#subjectName').val().toUpperCase();
+        
+        // Validate form
+        if (!subjectCode || !subjectName) {
+            alert('Please fill out all fields');
+            return;
+        }
+        
+        // Send data to server
+        $.ajax({
+            url: '/api/subjects/create',
+            type: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({
+                subject_code: subjectCode,
+                subject_name: subjectName
+            }),
+            success: function(response) {
+                if (response.status === 'success') {
+                    // Add new subject to dropdown
+                    const option = new Option(
+                        `${response.subject.subject_code} - ${response.subject.subject_name}`, 
+                        response.subject.subject_id
+                    );
+                    $('#subject').append(option);
+                    
+                    // Clear form
+                    $('#addSubjectForm')[0].reset();
+                    
+                    // Close modal
+                    var subjectModal = bootstrap.Modal.getInstance(document.getElementById('addSubjectModal'));
+                    subjectModal.hide();
+                    
+                    // Show success message
+                    alert('Subject added successfully');
+                } else {
+                    alert(response.message || 'Failed to add subject');
+                }
+            },
+            error: function(xhr) {
+                alert('Error: ' + (xhr.responseJSON ? xhr.responseJSON.message : 'Could not add subject'));
+            }
+        });
+    });
+    
+    // Handle Add Teacher button click
+    $('#addTeacherBtn').on('click', function() {
+        // Open Add Teacher Modal
+        $('#addTeacherForm')[0].reset();
+        $('#addTeacherModal').modal('show');
+    });
+    
+    // Handle Save Teacher button click
+    $('#saveTeacher').on('click', function() {
+        // Get form data
+        const firstName = $('#teacherFirstName').val().toUpperCase();
+        const middleInitial = $('#teacherMiddleInitial').val().toUpperCase();
+        const lastName = $('#teacherLastName').val().toUpperCase();
+        const email = $('#teacherEmail').val(); // Keep email as is
+        
+        // Validate form
+        if (!firstName || !lastName) {
+            alert('First name and last name are required');
+            return;
+        }
+        
+        // Send data to server
+        $.ajax({
+            url: '/api/teachers/create',
+            type: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({
+                first_name: firstName,
+                middle_initial: middleInitial,
+                last_name: lastName,
+                email: email
+            }),
+            success: function(response) {
+                if (response.status === 'success') {
+                    // Format teacher name
+                    let teacherName = `${firstName}`;
+                    if (middleInitial) {
+                        teacherName += ` ${middleInitial}.`;
+                    }
+                    teacherName += ` ${lastName}`;
+                    
+                    // Add new teacher to dropdown
+                    const option = new Option(teacherName, response.teacher.teacher_id);
+                    $('#teacher').append(option);
+                    
+                    // Clear form
+                    $('#addTeacherForm')[0].reset();
+                    
+                    // Close modal
+                    var teacherModal = bootstrap.Modal.getInstance(document.getElementById('addTeacherModal'));
+                    teacherModal.hide();
+                    
+                    // Show success message
+                    alert('Teacher added successfully');
+                } else {
+                    alert(response.message || 'Failed to add teacher');
+                }
+            },
+            error: function(xhr) {
+                alert('Error: ' + (xhr.responseJSON ? xhr.responseJSON.message : 'Could not add teacher'));
+            }
+        });
+    });
+});
+
+function updateSections(strandId) {
+    // Add AJAX call to get sections for selected strand
+    const gradeLevel = $('#gradeLevel').val();
+    
+    console.log(`Updating sections for strand ID: ${strandId}, grade level: ${gradeLevel}`);
+    
+    if (!strandId || !gradeLevel) {
+        console.log('Missing strand ID or grade level');
+        $('#section').empty().append('<option value="">Select Section</option>').prop('disabled', true);
+        return;
+    }
+    
+    // Show loading indicator
+    const sectionDropdown = $('#section');
+    sectionDropdown.prop('disabled', true);
+    sectionDropdown.html('<option value="">Loading sections...</option>');
+    
+    // Here's the problem - we need to properly format grade_level so it's not sent as 'Grade 11/12'
+    let gradeLevelValue = gradeLevel;
+    // If grade level starts with 'Grade ', extract just the number part
+    if (typeof gradeLevelValue === 'string' && gradeLevelValue.startsWith('Grade ')) {
+        gradeLevelValue = gradeLevelValue.replace('Grade ', '').trim();
+    }
+    
+    console.log(`Sending request with cleaned grade level: ${gradeLevelValue}`);
+    
+    $.ajax({
+        url: '/api/sections',
+        type: 'GET',
+        data: { 
+            strand_id: strandId,
+            grade_level: gradeLevelValue
+        },
+        success: function(data) {
+            console.log('Sections response:', data);
+            const sectionDropdown = $('#section');
+            sectionDropdown.empty();
+            sectionDropdown.append('<option value="">Select Section</option>');
+            
+            if (data.sections && data.sections.length > 0) {
+                console.log(`Found ${data.sections.length} sections`);
+                $.each(data.sections, function(index, section) {
+                    sectionDropdown.append(`<option value="${section.section_id}">${section.section_name}</option>`);
+                });
+                // Enable section dropdown
+                sectionDropdown.prop('disabled', false);
+            } else {
+                console.log('No sections found');
+                // Keep section dropdown disabled if no sections
+                sectionDropdown.prop('disabled', true);
+            }
+            
+            $('#scheduleTable').html('<p class="text-center text-muted">Please select a section to view schedule</p>');
+        },
+        error: function(xhr, status, error) {
+            console.error("Error fetching sections:", error);
+            console.error("Response:", xhr.responseText);
+            alert("Failed to load sections. Please try again.");
+            // Keep section dropdown disabled on error
+            $('#section').prop('disabled', true);
+        }
+    });
+}
+
+function loadSchedule(sectionId) {
+    // Redirecting to loadTimetable since we're removing the list view
+    loadTimetable(sectionId);
+}
+
+// Function to load subjects and teachers for the modal form
+function loadFormData(callback) {
+    let subjectsLoaded = false;
+    let teachersLoaded = false;
+    
+    function checkAllLoaded() {
+        if (subjectsLoaded && teachersLoaded && typeof callback === 'function') {
+            callback();
+        }
+    }
+    
+    // Load subjects
+    $.ajax({
+        url: '/api/subjects',
+        type: 'GET',
+        success: function(data) {
+            console.log('Subjects API response:', data);
+            
+            const subjectDropdown = $('#subject');
+            subjectDropdown.empty();
+            subjectDropdown.append('<option value="">Select Subject</option>');
+            
+            if (data.status === 'success' && data.subjects && data.subjects.length > 0) {
+                $.each(data.subjects, function(index, subject) {
+                    subjectDropdown.append(`<option value="${subject.subject_id}">${subject.subject_code} - ${subject.subject_name}</option>`);
+                });
+                console.log(`Loaded ${data.subjects.length} subjects`);
+            } else {
+                console.warn('No subjects returned from API');
+            }
+            
+            subjectsLoaded = true;
+            checkAllLoaded();
+        },
+        error: function(xhr, status, error) {
+            console.error("Error loading subjects:", error);
+            console.error("Response:", xhr.responseText);
+            subjectsLoaded = true;
+            checkAllLoaded();
+        }
+    });
+    
+    // Load teachers
+    $.ajax({
+        url: '/api/teachers',
+        type: 'GET',
+        success: function(data) {
+            console.log('Teachers API response:', data);
+            
+            const teacherDropdown = $('#teacher');
+            teacherDropdown.empty();
+            teacherDropdown.append('<option value="">Select Teacher</option>');
+            
+            if (data.status === 'success' && data.teachers && data.teachers.length > 0) {
+                $.each(data.teachers, function(index, teacher) {
+                    const middleInitial = teacher.middle_initial ? `${teacher.middle_initial}. ` : '';
+                    teacherDropdown.append(`<option value="${teacher.teacher_id}">${teacher.first_name} ${middleInitial}${teacher.last_name}</option>`);
+                });
+                console.log(`Loaded ${data.teachers.length} teachers`);
+            } else {
+                console.warn('No teachers returned from API');
+            }
+            
+            teachersLoaded = true;
+            checkAllLoaded();
+        },
+        error: function(xhr, status, error) {
+            console.error("Error loading teachers:", error);
+            console.error("Response:", xhr.responseText);
+            teachersLoaded = true;
+            checkAllLoaded();
+        }
+    });
+}
+
+// Function to open the add schedule modal
+function openScheduleModal() {
+    // Reset form
+    $('#scheduleForm')[0].reset();
+    $('#scheduleId').val('');
+    $('#sectionId').val($('#section').val());
+    
+    // Set modal title
+    $('#scheduleModalTitle').text('Add Schedule');
+    
+    // Show modal using Bootstrap 5 syntax
+    var scheduleModal = new bootstrap.Modal(document.getElementById('scheduleModal'));
+    scheduleModal.show();
+    
+    // Load form data (subjects and teachers)
+    loadFormData();
+}
+
+// Function to open the edit schedule modal
+function editSchedule(scheduleId) {
+    console.log(`Editing schedule with ID: ${scheduleId}`);
+    
+    // Get schedule data and populate the form
+    $.ajax({
+        url: `/api/schedules/${scheduleId}`,
+        type: 'GET',
+        success: function(data) {
+            console.log('API Response for schedule:', data);
+            
+            if (data.status === 'success' && data.schedule) {
+                const schedule = data.schedule;
+                
+                // Reset the form first
+                $('#scheduleForm')[0].reset();
+                
+                // Show the modal first
+                $('#scheduleModalTitle').text('Edit Schedule');
+                $('#scheduleModal').modal('show');
+                
+                // Set fixed fields that don't depend on dropdowns
+                $('#scheduleId').val(schedule.schedule_id);
+                $('#sectionId').val(schedule.section_id);
+                $('#dayOfWeek').val(schedule.day_of_week);
+                
+                // Format time for input elements (HH:MM)
+                // First try to use the time_start/time_end in HH:MM format
+                let timeStart = schedule.time_start;
+                let timeEnd = schedule.time_end;
+                
+                console.log(`Original time values from API: Start=${schedule.time_start}, End=${schedule.time_end}`);
+                console.log(`Display time values: Start=${schedule.time_start_display}, End=${schedule.time_end_display}`);
+                
+                // Ensure we have valid input time format (HH:MM)
+                timeStart = formatTimeForInput(timeStart);
+                timeEnd = formatTimeForInput(timeEnd);
+                
+                console.log(`Final time values for inputs: Start=${timeStart}, End=${timeEnd}`);
+                
+                // Set time input values
+                $('#timeStart').val(timeStart);
+                $('#timeEnd').val(timeEnd);
+                
+                // Load form data and then set dropdown values
+                loadFormData(function() {
+                    // Set dropdown values after they're loaded
+                    $('#subject').val(schedule.subject_id);
+                    $('#teacher').val(schedule.teacher_id);
+                    
+                    console.log('Form populated with schedule data:', {
+                        id: schedule.schedule_id,
+                        subject: schedule.subject_id,
+                        teacher: schedule.teacher_id,
+                        day: schedule.day_of_week,
+                        start: timeStart,
+                        end: timeEnd
+                    });
+                });
+            } else {
+                alert('Failed to load schedule data. Please try again.');
+            }
+        },
+        error: function(xhr, status, error) {
+            console.error("Error loading schedule data:", error);
+            console.error("Response:", xhr.responseText);
+            alert("Failed to load schedule data. Please try again.");
+        }
+    });
+}
+
+// Helper function to format time for input element (ensuring HH:MM format)
+function formatTimeForInput(timeString) {
+    if (!timeString) return '';
+    
+    // If already in HH:MM format, return as is
+    if (/^\d{2}:\d{2}$/.test(timeString)) {
+        return timeString;
+    }
+    
+    // For other formats, try to convert
+    try {
+        // If time contains AM/PM, convert to 24-hour format
+        if (timeString.toLowerCase().includes('am') || timeString.toLowerCase().includes('pm')) {
+            const [timePart, ampm] = timeString.split(' ');
+            const [hours, minutes] = timePart.split(':').map(Number);
+            
+            let hour24 = hours;
+            // Convert 12-hour to 24-hour format
+            if (ampm.toLowerCase() === 'pm' && hours < 12) {
+                hour24 = hours + 12;
+            } else if (ampm.toLowerCase() === 'am' && hours === 12) {
+                hour24 = 0;
+            }
+            
+            // Format as HH:MM
+            return `${hour24.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+        }
+        
+        // If it's just a number, assume it's hours
+        if (!isNaN(timeString)) {
+            return `${parseInt(timeString).toString().padStart(2, '0')}:00`;
+        }
+        
+        // If we have a colon-separated time without leading zeros
+        if (timeString.includes(':')) {
+            const [hours, minutes] = timeString.split(':').map(Number);
+            return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+        }
+    } catch (e) {
+        console.error('Error formatting time:', e);
+    }
+    
+    // Return original if we can't parse it
+    return timeString;
+}
+
+// Function to save a schedule
+function saveSchedule() {
+    const scheduleData = {
+        schedule_id: $('#scheduleId').val() || null,
+        section_id: $('#sectionId').val(),
+        subject_id: $('#subject').val(),
+        teacher_id: $('#teacher').val(),
+        day_of_week: $('#dayOfWeek').val(),
+        time_start: $('#timeStart').val(),
+        time_end: $('#timeEnd').val()
+    };
+    
+    console.log('Saving schedule data:', scheduleData);
+    
+    // Validate form
+    if (!scheduleData.section_id || !scheduleData.subject_id || !scheduleData.teacher_id || 
+        !scheduleData.day_of_week || !scheduleData.time_start || !scheduleData.time_end) {
+        alert('Please fill in all fields.');
+        return;
+    }
+    
+    // Validate time range
+    if (scheduleData.time_start >= scheduleData.time_end) {
+        alert('End time must be after start time.');
+        return;
+    }
+    
+    // Check if schedule fits within timetable bounds (7:30 AM to 6:00 PM)
+    const startHour = parseInt(scheduleData.time_start.split(':')[0]);
+    const startMinute = parseInt(scheduleData.time_start.split(':')[1]);
+    const endHour = parseInt(scheduleData.time_end.split(':')[0]);
+    const endMinute = parseInt(scheduleData.time_end.split(':')[1]);
+    
+    // Create Date objects for comparison (using arbitrary date)
+    const scheduleStart = new Date(2000, 0, 1, startHour, startMinute);
+    const scheduleEnd = new Date(2000, 0, 1, endHour, endMinute);
+    const timetableStart = new Date(2000, 0, 1, 7, 30); // 7:30 AM
+    const timetableEnd = new Date(2000, 0, 1, 18, 0);   // 6:00 PM
+    
+    if (scheduleStart < timetableStart || scheduleEnd > timetableEnd) {
+        alert('Schedule must be between 7:30 AM and 6:00 PM.');
+        return;
+    }
+    
+    // Send data to server
+    $.ajax({
+        url: '/api/schedules/save',
+        type: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify(scheduleData),
+        success: function(data) {
+            if (data.status === 'success') {
+                // Close modal
+                const modalElement = document.getElementById('scheduleModal');
+                if (modalElement) {
+                    const modalInstance = bootstrap.Modal.getInstance(modalElement);
+                    if (modalInstance) {
+                        modalInstance.hide();
+                    }
+                }
+                
+                // Reload timetable view with updated schedules
+                loadTimetable($('#section').val());
+                
+                // Show success message
+                alert('Schedule saved successfully!');
+            } else {
+                alert('Failed to save schedule: ' + data.message);
+            }
+        },
+        error: function(xhr, status, error) {
+            console.error("Error saving schedule:", error);
+            console.error("Response:", xhr.responseText);
+            alert("Failed to save schedule. Please try again.");
+        }
+    });
+}
+
+// Function to delete a schedule
+function deleteSchedule(scheduleId) {
+    $.ajax({
+        url: `/api/schedules/delete/${scheduleId}`,
+        type: 'DELETE',
+        success: function(data) {
+            if (data.status === 'success') {
+                // Reload schedule with timetable view
+                loadTimetable($('#section').val());
+                
+                // Show success message
+                alert('Schedule deleted successfully!');
+            } else {
+                alert('Failed to delete schedule: ' + data.message);
+            }
+        },
+        error: function(xhr, status, error) {
+            console.error("Error deleting schedule:", error);
+            alert("Failed to delete schedule. Please try again.");
+        }
+    });
+}
+
+// Function to load the timetable view
+function loadTimetable(sectionId) {
+    if (!sectionId) {
+        console.error("loadTimetable: No section ID provided");
+        $('#scheduleTable').html('<p class="text-center text-muted">Please select a section to view schedule</p>');
+        return;
+    }
+    
+    console.log(`Loading timetable for section ID: ${sectionId}`);
+    
+    // Show loading indicator
+    $('#scheduleTable').html('<p class="text-center"><i class="fas fa-spinner fa-spin"></i> Loading timetable...</p>');
+    
+    $.ajax({
+        url: '/api/schedules',
+        type: 'GET',
+        data: { section_id: sectionId },
+        success: function(data) {
+            console.log("Schedules API response:", data);
+            
+            if (data.status === 'success') {
+                // Always create the timetable, even when no schedules are found
+                createTimetableView(sectionId, data.schedules || []);
+            } else {
+                console.error("API returned error:", data.message);
+                $('#scheduleTable').html('<p class="text-center text-danger">Error loading schedule: ' + (data.message || 'Unknown error') + '</p>');
+            }
+        },
+        error: function(xhr, status, error) {
+            console.error("Error fetching schedule:", error);
+            console.error("Response:", xhr.responseText);
+            console.error("Status:", status);
+            $('#scheduleTable').html('<p class="text-center text-danger">Failed to load timetable. Please try again.</p>');
+        }
+    });
+}
+
+// Function to create and display the timetable
+function createTimetableView(sectionId, schedules) {
+    console.log("Creating timetable view with schedules:", schedules);
+    
+    // Define time slots from 7:30 AM to 6:00 PM in 15-minute intervals
+    const startTime = new Date(2000, 0, 1, 7, 30); // 7:30 AM
+    const endTime = new Date(2000, 0, 1, 18, 0);   // 6:00 PM
+    
+    // Create time slots
+    const timeSlots = [];
+    let currentTime = new Date(startTime);
+    
+    while (currentTime < endTime) {
+        const slotStart = new Date(currentTime);
+        currentTime.setMinutes(currentTime.getMinutes() + 15);
+        const slotEnd = new Date(currentTime);
+        
+        timeSlots.push({
+            start: formatTime(slotStart),
+            end: formatTime(slotEnd),
+            label: `${formatTime(slotStart)}-${formatTime(slotEnd)}`
+        });
+    }
+    
+    // Create days of the week - using uppercase for consistency
+    const daysOfWeek = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
+    
+    // Show an appropriate message based on whether schedules exist
+    let scheduleMessage = '';
+    if (!schedules || schedules.length === 0) {
+        scheduleMessage = '<div class="alert alert-info mt-2 mb-2">No schedules found for this class. Use the Add Schedule button to create a schedule.</div>';
+    }
+    
+    // Create HTML for the timetable
+    let html = `
+        <div class="mt-4">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h4>Weekly Timetable</h4>
+                <button class="btn btn-success" id="addScheduleToTimetableBtn">
+                    <i class="fas fa-plus"></i> Add Schedule
+                </button>
+            </div>
+            ${scheduleMessage}
+            <div class="table-responsive timetable-container">
+                <table class="table table-bordered timetable">
+                    <thead>
+                        <tr>
+                            <th class="time-header">Time</th>
+                            ${daysOfWeek.map(day => `<th class="day-header">${day}</th>`).join('')}
+                        </tr>
+                    </thead>
+                    <tbody>
+    `;
+    
+    // Add rows for each time slot
+    timeSlots.forEach(slot => {
+        html += `
+            <tr>
+                <td class="time-slot">${slot.label}</td>
+                ${daysOfWeek.map(day => `<td class="schedule-cell" data-day="${day}" data-start="${slot.start}" data-end="${slot.end}"></td>`).join('')}
+            </tr>
+        `;
+    });
+    
+    html += `
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    `;
+    
+    // Add the timetable to the page
+    $('#scheduleTable').html(html);
+    
+    // Add click handlers for the Add Schedule button
+    $('#addScheduleToTimetableBtn').click(function() {
+        // Reset the form
+        $('#scheduleForm')[0].reset();
+        // Set the section ID for the form
+        $('#scheduleId').val('');
+        $('#sectionId').val(sectionId);
+        
+        // Show the modal first
+        $('#scheduleModalTitle').text('Add Schedule');
+        var scheduleModal = new bootstrap.Modal(document.getElementById('scheduleModal'));
+        scheduleModal.show();
+        
+        // Load subjects and teachers
+        loadFormData();
+    });
+    
+    // Populate the timetable with schedules
+    if (schedules && schedules.length > 0) {
+        console.log(`Populating ${schedules.length} schedules on timetable`);
+        schedules.forEach(schedule => {
+            // Ensure day of week is uppercase for consistency
+            if (schedule.day_of_week) {
+                schedule.day_of_week = schedule.day_of_week.toUpperCase();
+            }
+            populateScheduleInTimetable(schedule);
+        });
+    }
+    
+    // Add CSS for the timetable
+    addTimetableStyles();
+}
+
+// Function to populate a schedule in the timetable
+function populateScheduleInTimetable(schedule) {
+    const day = schedule.day_of_week;
+    const startTime = convertTimeStringTo24HourFormat(schedule.time_start);
+    const endTime = convertTimeStringTo24HourFormat(schedule.time_end);
+    
+    console.log(`Populating schedule: ${schedule.subject_code} on ${day} from ${startTime} to ${endTime}`);
+    
+    // Check if we have missing data
+    if (!day || !startTime || !endTime || !schedule.subject_code) {
+        console.error("Missing critical data for schedule:", schedule);
+        return;
+    }
+    
+    let cellsFound = 0;
+    
+    // Find cells that fall within this schedule's time range
+    $('.schedule-cell').each(function() {
+        const cellDay = $(this).data('day');
+        const cellStart = convertTimeStringTo24HourFormat($(this).data('start'));
+        const cellEnd = convertTimeStringTo24HourFormat($(this).data('end'));
+        
+        // Debug cell data - case insensitive comparison for day
+        if (cellDay && day && cellDay.toUpperCase() === day.toUpperCase()) {
+            console.log(`Found cell for ${day} with time ${cellStart}-${cellEnd}`);
+        }
+        
+        // Check if this cell belongs to this schedule - case insensitive comparison for day
+        // First check if days match (case insensitive)
+        if (cellDay && day && cellDay.toUpperCase() === day.toUpperCase()) {
+            // Then check if the time ranges overlap
+            const timeOverlap = 
+                // Cell start time is within schedule time range
+                (cellStart >= startTime && cellStart < endTime) || 
+                // Cell end time is within schedule time range
+                (cellEnd > startTime && cellEnd <= endTime) ||
+                // Schedule time range is entirely within cell
+                (startTime >= cellStart && endTime <= cellEnd) ||
+                // Cell time range is entirely within schedule
+                (cellStart >= startTime && cellEnd <= endTime);
+                
+            if (timeOverlap) {
+                // Record that we found a cell
+                cellsFound++;
+                
+                // Calculate if this cell is the first in the time span
+                const isFirstCell = (cellStart <= startTime && cellEnd > startTime);
+                
+                console.log(`Cell matches: day=${cellDay}, start=${cellStart}, end=${cellEnd}, isFirstCell=${isFirstCell}`);
+                
+                // If it's the first cell, add a schedule item that spans multiple rows
+                if (isFirstCell) {
+                    const durationInMinutes = getTimeDifferenceInMinutes(startTime, endTime);
+                    const rowSpan = Math.ceil(durationInMinutes / 15);
+                    
+                    console.log(`Creating schedule block with rowSpan=${rowSpan}, duration=${durationInMinutes} minutes`);
+                    
+                    $(this).addClass('scheduled')
+                           .attr('rowspan', rowSpan)
+                           .html(`
+                                <div class="schedule-item">
+                                    <strong>${schedule.subject_code}</strong>
+                                    <div>${schedule.subject_name}</div>
+                                    <div class="teacher">${schedule.first_name} ${schedule.middle_initial || ''} ${schedule.last_name}</div>
+                                    <div class="time">${schedule.time_start} - ${schedule.time_end}</div>
+                                    <div class="schedule-actions">
+                                        <button class="btn btn-sm btn-primary edit-from-timetable" data-id="${schedule.schedule_id}">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                        <button class="btn btn-sm btn-danger delete-from-timetable" data-id="${schedule.schedule_id}">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                           `);
+                } else {
+                    // Hide other cells that are covered by the rowspan
+                    $(this).addClass('hidden-cell').hide();
+                }
+            }
+        }
+    });
+    
+    if (cellsFound === 0) {
+        console.error(`No matching cells found for schedule on ${day} from ${startTime} to ${endTime}`);
+        console.log("Available day values in cells:", $('.schedule-cell').map(function() { return $(this).data('day'); }).get());
+        
+        // Add debug info for all the day values in cells
+        console.log("Day value comparison results:");
+        $('.schedule-cell').each(function() {
+            const cellDay = $(this).data('day');
+            if (cellDay) {
+                console.log(`Cell day: ${cellDay}, Schedule day: ${day}, Match: ${cellDay.toUpperCase() === day.toUpperCase()}`);
+            }
+        });
+    } else {
+        console.log(`Found ${cellsFound} matching cells for schedule`);
+    }
+    
+    // Add click handlers for edit and delete buttons
+    $('.edit-from-timetable').off('click').on('click', function() {
+        const scheduleId = $(this).data('id');
+        editSchedule(scheduleId);
+    });
+    
+    $('.delete-from-timetable').off('click').on('click', function() {
+        const scheduleId = $(this).data('id');
+        if (confirm('Are you sure you want to delete this schedule?')) {
+            deleteSchedule(scheduleId);
+        }
+    });
+}
+
+// Helper function to format time (Date object) to HH:MM format
+function formatTime(date) {
+    const hours = date.getHours().toString().padStart(2, '0');
+    const minutes = date.getMinutes().toString().padStart(2, '0');
+    return `${hours}:${minutes}`;
+}
+
+// Helper function to convert HH:MM time string to a comparable format
+function convertTimeStringTo24HourFormat(timeString) {
+    if (!timeString) {
+        console.warn("convertTimeStringTo24HourFormat received empty timeString");
+        return '00:00';
+    }
+    
+    console.log(`Converting time string: ${timeString}, type: ${typeof timeString}`);
+    
+    // Try to standardize different time formats
+    try {
+        // If it's already a string in HH:MM format, return as is
+        if (typeof timeString === 'string' && /^\d{2}:\d{2}$/.test(timeString)) {
+            console.log(`Time already in HH:MM format: ${timeString}`);
+            return timeString;
+        }
+        
+        // If it's an object with data-* attribute (from jQuery's data() method)
+        if (typeof timeString === 'object' && timeString !== null) {
+            console.log("Time is an object:", timeString);
+            // Try common properties that might contain the time
+            if (timeString.value) return convertTimeStringTo24HourFormat(timeString.value);
+            if (timeString.text) return convertTimeStringTo24HourFormat(timeString.text);
+            
+            // Convert object to string as fallback
+            timeString = String(timeString);
+        }
+        
+        // If it contains AM/PM, convert to 24-hour format
+        if (typeof timeString === 'string' && (timeString.toLowerCase().includes('am') || timeString.toLowerCase().includes('pm'))) {
+            console.log(`Converting 12-hour format: ${timeString}`);
+            const [time, ampm] = timeString.split(/\s+/);
+            const [hours, minutes] = time.split(':').map(Number);
+            
+            let hour24 = hours;
+            if (ampm.toLowerCase() === 'pm' && hours < 12) {
+                hour24 = hours + 12;
+            } else if (ampm.toLowerCase() === 'am' && hours === 12) {
+                hour24 = 0;
+            }
+            
+            const result = `${hour24.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+            console.log(`Converted 12-hour time ${timeString} to 24-hour: ${result}`);
+            return result;
+        }
+        
+        // If it's a string with a colon but missing leading zeros, add them
+        if (typeof timeString === 'string' && timeString.includes(':')) {
+            const [hours, minutes] = timeString.split(':').map(Number);
+            const formattedTime = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+            console.log(`Formatted time with padded zeros: ${formattedTime}`);
+            return formattedTime;
+        }
+    } catch (e) {
+        console.error(`Error converting time string "${timeString}":`, e);
+    }
+    
+    // Return original if we can't parse it
+    return typeof timeString === 'string' ? timeString : '00:00';
+}
+
+// Helper function to calculate time difference in minutes
+function getTimeDifferenceInMinutes(startTime, endTime) {
+    const [startHour, startMinute] = startTime.split(':').map(Number);
+    const [endHour, endMinute] = endTime.split(':').map(Number);
+    
+    const startMinutes = startHour * 60 + startMinute;
+    const endMinutes = endHour * 60 + endMinute;
+    
+    return endMinutes - startMinutes;
+}
+
+// Function to add CSS styles for the timetable
+function addTimetableStyles() {
+    // Use JavaScript to add CSS styles dynamically
+    const styleElement = document.createElement('style');
+    styleElement.textContent = `
+        .timetable {
+            width: 100%;
+            border-collapse: collapse;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+        
+        .timetable th {
+            text-align: center;
+            vertical-align: middle;
+            font-weight: bold;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            background-color: #f0f0f0; /* All header cells get the same background */
+            color: #333;
+            padding: 8px;
+            border: 1px solid #ddd;
+        }
+        
+        .timetable .time-header, .timetable .day-header {
+            background-color: #f0f0f0;
+            color: #333;
+            padding: 8px;
+        }
+        
+        .timetable .time-slot {
+            background-color: #f0f0f0;
+            color: #333;
+            font-weight: bold;
+            text-align: center;
+            width: 100px;
+            position: sticky;
+            left: 0;
+            z-index: 5;
+        }
+        
+        .timetable .schedule-cell {
+            vertical-align: top;
+            height: 50px;
+            min-width: 120px;
+            transition: background-color 0.2s;
+        }
+        
+        .timetable .schedule-cell:hover {
+            background-color: #f9f9f9;
+        }
+        
+        .timetable .scheduled {
+            background-color: #e3f2fd;
+            padding: 0;
+            position: relative;
+        }
+        
+        .schedule-item {
+            padding: 5px;
+            height: 100%;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        
+        .schedule-item strong {
+            font-size: 14px;
+            margin-bottom: 2px;
+        }
+        
+        .schedule-item .teacher {
+            font-size: 12px;
+            font-style: italic;
+            margin-top: 2px;
+        }
+        
+        .schedule-item .time {
+            font-size: 12px;
+            color: #555;
+            margin-top: 2px;
+        }
+        
+        .schedule-actions {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            display: none;
+        }
+        
+        .scheduled:hover .schedule-actions {
+            display: flex;
+        }
+        
+        .schedule-actions button {
+            margin-left: 2px;
+            padding: 2px 5px;
+            font-size: 12px;
+        }
+        
+        .timetable-container {
+            max-height: 70vh;
+            overflow-y: auto;
+        }
+    `;
+    document.head.appendChild(styleElement);
+}
+
+// Setup save button in the modal
+$(document).on('click', '#saveSchedule', function() {
+    saveSchedule();
+});
+</script>
+{% endblock %}

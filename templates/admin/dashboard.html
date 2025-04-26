@@ -1,0 +1,734 @@
+{% extends 'admin/layout.html' %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<!-- Stats Cards -->
+<div class="stats-container">
+    <div class="stat-card">
+        <div class="stat-icon">
+            <i class="fas fa-user-graduate"></i>
+        </div>
+        <div class="stat-info">
+            <h2 class="stat-value">{{ total_students }}</h2>
+            <p class="stat-label">Total Students</p>
+        </div>
+    </div>
+    
+    <div class="stat-card">
+        <div class="stat-icon">
+            <i class="fas fa-chalkboard"></i>
+        </div>
+        <div class="stat-info">
+            <h2 class="stat-value">{{ total_sections }}</h2>
+            <p class="stat-label">Total Sections</p>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Exits Panel -->
+<div class="panel">
+    <div class="panel-header">
+        <h2 class="panel-title">Recent Exits</h2>
+        <form action="{{ url_for('clear_logs') }}" method="POST" class="ml-auto">
+            <button type="submit" class="btn btn-sm btn-danger">
+                <i class="fas fa-trash"></i> Clear All
+            </button>
+        </form>
+    </div>
+    <div class="panel-body">
+        <div class="recent-exits-list">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>ID Number</th>
+                        <th>Student Name</th>
+                        <th>Grade/Section</th>
+                        <th>Exit Time</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody id="exitLogsTableBody">
+                    {% if exit_logs %}
+                        {% for log in exit_logs %}
+                        <tr>
+                            <td>{{ log.id_number }}</td>
+                            <td>{{ log.student_name }}</td>
+                            <td>{{ log.grade_section }}</td>
+                            <td data-time="{{ log.exit_time }}">{{ log.exit_time }}</td>
+                            <td><span class="badge {% if log.status == 'ALLOWED' %}badge-success{% else %}badge-danger{% endif %}">{{ log.status }}</span></td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="5" class="text-center">No exit logs found</td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block styles %}
+<style>
+    /* Styles for stats container and cards */
+    .stats-container {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 1.5rem;
+        margin-bottom: 2rem;
+    }
+
+    .stat-card {
+        background: white;
+        border-radius: 8px;
+        padding: 1.5rem;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+    }
+
+    .stat-icon {
+        width: 48px;
+        height: 48px;
+        background: #f8f9fa;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+        color: #002B5B;
+    }
+
+    .stat-info {
+        flex: 1;
+    }
+
+    .stat-value {
+        margin: 0;
+        font-size: 1.5rem;
+        font-weight: 600;
+        color: #2c3e50;
+    }
+
+    .stat-label {
+        margin: 0;
+        font-size: 0.875rem;
+        color: #6c757d;
+    }
+    
+    /* Panel styles */
+    .panel {
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        margin-bottom: 2rem;
+    }
+    
+    .panel-header {
+        padding: 1.25rem 1.5rem;
+        border-bottom: 1px solid #f0f0f0;
+        display: flex;
+        align-items: center;
+    }
+    
+    .panel-title {
+        margin: 0;
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: #2c3e50;
+    }
+    
+    .panel-body {
+        padding: 1.5rem;
+    }
+    
+    /* Recent exits table */
+    .table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+    
+    .table th {
+        background-color: #f8f9fa;
+        color: #495057;
+        font-weight: 600;
+        text-align: left;
+        padding: 0.75rem 1rem;
+    }
+    
+    .table td {
+        padding: 0.75rem 1rem;
+        border-top: 1px solid #f0f0f0;
+        color: #495057;
+    }
+    
+    .table tr:hover {
+        background-color: #f8f9fa;
+    }
+    
+    /* New row highlight animation */
+    @keyframes highlightRow {
+        0%, 15% { background-color: rgba(76, 175, 80, 0.2); }
+        100% { background-color: transparent; }
+    }
+    
+    .new-exit-row {
+        animation: highlightRow 3s ease-out;
+    }
+    
+    .exit-timestamp {
+        white-space: nowrap;
+    }
+    
+    .badge {
+        display: inline-block;
+        padding: 0.25rem 0.5rem;
+        border-radius: 4px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-align: center;
+    }
+    
+    .badge-success {
+        background-color: #4CAF50;
+        color: white;
+    }
+    
+    .badge-danger {
+        background-color: #FF0000;
+        color: white;
+    }
+    
+    /* Clear logs button */
+    .ml-auto {
+        margin-left: auto;
+    }
+    
+    .btn {
+        display: inline-block;
+        font-weight: 500;
+        text-align: center;
+        vertical-align: middle;
+        cursor: pointer;
+        border: 1px solid transparent;
+        padding: 0.375rem 0.75rem;
+        font-size: 0.875rem;
+        line-height: 1.5;
+        border-radius: 0.25rem;
+        transition: all 0.15s ease-in-out;
+    }
+    
+    .btn-sm {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.75rem;
+        line-height: 1.5;
+        border-radius: 0.2rem;
+    }
+    
+    .btn-danger {
+        color: #fff;
+        background-color: #dc3545;
+        border-color: #dc3545;
+    }
+    
+    .btn-danger:hover {
+        background-color: #c82333;
+        border-color: #bd2130;
+    }
+
+    /* Avatar image styling */
+    .avatar {
+        width: 40px;
+        height: 40px;
+        object-fit: cover;
+        border-radius: 50%;
+        border: 2px solid #f0f0f0;
+    }
+
+    .avatar-sm {
+        width: 32px;
+        height: 32px;
+    }
+
+    /* Flex alignment for table cells */
+    .d-flex {
+        display: flex;
+        align-items: center;
+    }
+
+    .align-items-center {
+        align-items: center;
+    }
+
+    .me-2 {
+        margin-right: 0.5rem;
+    }
+
+    /* Text styling */
+    .text-sm {
+        font-size: 0.875rem;
+        font-weight: 400;
+    }
+
+    .text-xs {
+        font-size: 0.75rem;
+    }
+
+    .mb-0 {
+        margin-bottom: 0;
+    }
+
+    .text-secondary {
+        color: #6c757d;
+    }
+
+    /* Badge styling refinements */
+    .bg-gradient-success {
+        background: linear-gradient(45deg, #2ecc71, #27ae60);
+    }
+
+    .bg-gradient-danger {
+        background: linear-gradient(45deg, #e74c3c, #c0392b);
+    }
+
+    /* Table cell spacing */
+    .table td {
+        vertical-align: middle;
+        padding: 0.6rem 1rem;
+    }
+
+    /* New highlight effect */
+    .highlight-active {
+        background-color: rgba(76, 175, 80, 0.3);
+        transition: background-color 2s ease-out;
+    }
+</style>
+{% endblock %}
+
+{% block scripts %}
+<style>
+    @keyframes highlightRow {
+        0%, 15% { background-color: rgba(76, 175, 80, 0.2); }
+        100% { background-color: transparent; }
+    }
+    
+    .new-exit-row {
+        animation: highlightRow 3s ease-out;
+    }
+    
+    .exit-timestamp {
+        white-space: nowrap;
+    }
+</style>
+
+<script>
+    // Initialize Socket.IO for admin dashboard
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log("Admin dashboard loaded");
+        
+        // First format any timestamps already in the page
+        formatAllTimestamps();
+        
+        // Load any cached exits from localStorage for immediate display
+        loadCachedExits();
+        
+        // Load the latest exits from the API
+        loadRecentExits();
+        
+        // Also poll every 60 seconds as fallback
+        setInterval(loadRecentExits, 60000);
+        
+        // Set up Socket.IO connection for real-time updates
+        setupAdminSocketIO();
+    });
+    
+    // Load exits cached in localStorage 
+    function loadCachedExits() {
+        try {
+            console.log("Checking for cached exits in localStorage");
+            const cachedExits = JSON.parse(localStorage.getItem('adminRecentExits') || '[]');
+            
+            if (cachedExits && cachedExits.length > 0) {
+                console.log(`Found ${cachedExits.length} cached exits in localStorage`);
+                
+                // Format timestamps before displaying
+                cachedExits.forEach(exit => {
+                    if (exit.exit_time) {
+                        exit.formatted_time = formatTimestamp(exit.exit_time);
+                    }
+                });
+                
+                // No need to add these to the UI if they're already there,
+                // but we can check if we need to update counts
+                updateExitCount();
+            } else {
+                console.log("No cached exits found in localStorage");
+            }
+        } catch (error) {
+            console.error("Error loading cached exits:", error);
+        }
+    }
+    
+    // Cache a new exit to localStorage
+    function cacheExit(exitData) {
+        try {
+            // Get existing exits from localStorage
+            const existingExits = JSON.parse(localStorage.getItem('adminRecentExits') || '[]');
+            
+            // Check if exit is already cached (by ID or combination of name+time)
+            const isDuplicate = existingExits.some(exit => {
+                return (
+                    (exit.log_id && exit.log_id === exitData.log_id) ||
+                    (exit.student_name === exitData.student_name && exit.exit_time === exitData.exit_time)
+                );
+            });
+            
+            if (!isDuplicate) {
+                // Add new exit to the beginning
+                existingExits.unshift(exitData);
+                
+                // Keep only the most recent 50 exits
+                const limitedExits = existingExits.slice(0, 50);
+                
+                // Save back to localStorage
+                localStorage.setItem('adminRecentExits', JSON.stringify(limitedExits));
+                
+                console.log(`Cached new exit for ${exitData.student_name} to localStorage`);
+            } else {
+                console.log(`Exit for ${exitData.student_name} already cached`);
+            }
+        } catch (error) {
+            console.error("Error caching exit:", error);
+        }
+    }
+    
+    // Set up Socket.IO connection for admin dashboard
+    function setupAdminSocketIO() {
+        console.log("ADMIN DASHBOARD: Setting up Socket.IO connection for real-time updates");
+        
+        if (typeof io !== 'function') {
+            console.error("ADMIN DASHBOARD: Socket.IO not available - exit logs will not update in real-time");
+            // Add fallback when Socket.IO is not available
+            setInterval(loadRecentExits, 10000); // Poll every 10 seconds as fallback
+            return;
+        }
+        
+        try {
+            // Connect to Socket.IO
+            console.log("ADMIN DASHBOARD: Creating Socket.IO connection");
+            const socket = io.connect(window.location.origin, {
+                reconnectionDelayMax: 10000,
+                reconnectionAttempts: 10,
+                timeout: 20000,
+                transports: ['websocket', 'polling'] // Try WebSocket first, then polling
+            });
+            
+            // Store socket in window object for debugging
+            window.adminSocket = socket;
+            
+            // Connection events with detailed logging
+            socket.on('connect', function() {
+                console.log('ADMIN DASHBOARD: Socket.IO connected! Connection ID:', socket.id);
+                socket.emit('test_connection');
+                
+                // Load initial data when connected
+                loadRecentExits();
+            });
+            
+            socket.on('disconnect', function(reason) {
+                console.log('ADMIN DASHBOARD: Socket.IO disconnected - Reason:', reason);
+                // Set up a fallback to reload data if socket is disconnected
+                setTimeout(loadRecentExits, 3000);
+            });
+            
+            socket.on('reconnect', function(attemptNumber) {
+                console.log(`ADMIN DASHBOARD: Socket.IO reconnected after ${attemptNumber} attempts`);
+                // Reload all exit logs to ensure we're up to date after reconnection
+                loadRecentExits();
+            });
+            
+            socket.on('reconnect_error', function(error) {
+                console.error('ADMIN DASHBOARD: Socket.IO reconnection error:', error);
+                // Add fallback for reconnection errors
+                setTimeout(loadRecentExits, 5000);
+            });
+            
+            // New exit log event
+            socket.on('new_exit_log', function(data) {
+                console.log('ADMIN DASHBOARD: NEW EXIT LOG RECEIVED VIA SOCKET:', data);
+                if (data) {
+                    // Add the new exit to the table
+                    addNewExitRow(data);
+                    // Update the exit count
+                    updateExitCount();
+                    // Play notification sound
+                    playNotificationSound();
+                    // Cache the exit data
+                    cacheExit(data);
+                } else {
+                    console.error('ADMIN DASHBOARD: Received empty exit log data');
+                }
+            });
+            
+            // Initial exits event
+            socket.on('initial_exits', function(data) {
+                console.log('ADMIN DASHBOARD: Received initial exit logs:', data);
+                if (Array.isArray(data) && data.length > 0) {
+                    populateExitLogsTable(data);
+                }
+            });
+            
+            // Error handling
+            socket.on('error', function(error) {
+                console.error('ADMIN DASHBOARD: Socket.IO error:', error);
+                // Add fallback for socket errors
+                setTimeout(loadRecentExits, 5000);
+            });
+            
+            socket.on('connect_error', function(error) {
+                console.error('ADMIN DASHBOARD: Socket.IO connection error:', error);
+                // Add fallback for connection errors
+                setTimeout(loadRecentExits, 5000);
+            });
+            
+            // Set up a heartbeat to keep the connection alive
+            setInterval(function() {
+                if (socket.connected) {
+                    socket.emit('test_connection');
+                    console.log('ADMIN DASHBOARD: Sent heartbeat to server');
+                } else {
+                    console.warn('ADMIN DASHBOARD: Socket disconnected, attempting to reconnect...');
+                    socket.connect();
+                }
+            }, 30000); // Send heartbeat every 30 seconds
+            
+        } catch (error) {
+            console.error('ADMIN DASHBOARD: Socket.IO initialization error:', error);
+            // Add fallback for initialization errors
+            setInterval(loadRecentExits, 10000);
+        }
+    }
+    
+    // Format a single timestamp
+    function formatTimestamp(timestampStr) {
+        if (!timestampStr) return '';
+        
+        try {
+            const date = new Date(timestampStr);
+            if (isNaN(date.getTime())) return timestampStr;
+            
+            // Format as "Tuesday, March 25, 2025 - 4:27 P.M."
+            const options = {
+                weekday: 'long',
+                month: 'long',
+                day: 'numeric',
+                year: 'numeric',
+                hour: 'numeric',
+                minute: 'numeric',
+                hour12: true
+            };
+            
+            let formattedDate = date.toLocaleString('en-US', options);
+            
+            // Replace the time portion to add proper capitalization for A.M./P.M.
+            const timeParts = formattedDate.split(', ');
+            if (timeParts.length > 2) {
+                const datePart = timeParts.slice(0, 3).join(', ');
+                const timePart = timeParts[3] || '';
+                
+                // Insert a dash and capitalize AM/PM with periods
+                const timeWithMeridiem = timePart.replace(' AM', ' A.M.').replace(' PM', ' P.M.');
+                formattedDate = `${datePart} - ${timeWithMeridiem}`;
+            }
+            
+            return formattedDate;
+        } catch (e) {
+            console.error('Error formatting timestamp:', e);
+            return timestampStr;
+        }
+    }
+    
+    // Format all timestamps in the table
+    function formatAllTimestamps() {
+        const timestamps = document.querySelectorAll('.exit-timestamp');
+        timestamps.forEach(function(element) {
+            const originalTime = element.getAttribute('data-original-time');
+            if (originalTime) {
+                element.textContent = formatTimestamp(originalTime);
+            }
+        });
+    }
+    
+    // Load recent exits from the server API
+    function loadRecentExits() {
+        console.log("ADMIN DASHBOARD: Loading recent exits from API");
+        
+        // Add cache-busting parameter
+        const url = '/api/recent-exits?_=' + new Date().getTime();
+        
+        // Fetch recent exits with cache control headers
+        fetch(url, {
+            method: 'GET',
+            headers: {
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                'Pragma': 'no-cache',
+                'Expires': '0'
+            }
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok: ' + response.status);
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log("ADMIN DASHBOARD: Received exit logs from API:", data.length);
+            populateExitLogsTable(data);
+        })
+        .catch(error => {
+            console.error('ADMIN DASHBOARD: Error fetching recent exits:', error);
+        });
+    }
+    
+    // Populate exit logs table with data
+    function populateExitLogsTable(exitLogs) {
+        const tableBody = document.getElementById('exitLogsTableBody');
+        if (!tableBody) {
+            console.error('ADMIN DASHBOARD: Exit logs table body not found');
+            return;
+        }
+        
+        // Clear existing rows
+        tableBody.innerHTML = '';
+        
+        // Add rows for each exit log
+        if (Array.isArray(exitLogs) && exitLogs.length > 0) {
+            exitLogs.forEach(log => {
+                const row = createExitLogRow(log);
+                tableBody.appendChild(row);
+            });
+        } else {
+            // Add empty row if no logs
+            const emptyRow = document.createElement('tr');
+            emptyRow.innerHTML = '<td colspan="5" class="text-center">No exit logs found</td>';
+            tableBody.appendChild(emptyRow);
+        }
+    }
+    
+    // Create a table row for an exit log
+    function createExitLogRow(log) {
+        const row = document.createElement('tr');
+        
+        // Format time
+        let formattedTime = 'Unknown';
+        let rawTime = log.exit_time;
+        
+        try {
+            if (log.exit_time) {
+                const exitDate = new Date(log.exit_time);
+                formattedTime = exitDate.toLocaleString();
+                rawTime = log.exit_time; // Store original time for data attribute
+            }
+        } catch (error) {
+            console.error('ADMIN DASHBOARD: Error formatting exit time:', error);
+            formattedTime = log.exit_time || 'Unknown';
+        }
+        
+        // Create row with formatted data
+        row.innerHTML = `
+            <td>${log.id_number || 'Unknown'}</td>
+            <td>${log.student_name || 'Unknown Student'}</td>
+            <td>${log.grade_section || 'Unknown'}</td>
+            <td data-time="${rawTime}">${formattedTime}</td>
+            <td><span class="badge ${log.status === 'ALLOWED' ? 'badge-success' : 'badge-danger'}">${log.status || 'UNKNOWN'}</span></td>
+        `;
+        
+        return row;
+    }
+    
+    // Update today's exit count
+    function updateExitCount() {
+        const todayExitCountElement = document.querySelector('.today-exit-count');
+        if (todayExitCountElement) {
+            const count = parseInt(todayExitCountElement.textContent, 10) || 0;
+            todayExitCountElement.textContent = count + 1;
+        }
+    }
+
+    // Play notification sound for new exits
+    function playNotificationSound() {
+        try {
+            const audio = new Audio('/static/sounds/notification.mp3');
+            audio.volume = 0.3;
+            audio.play().catch(e => console.log('Sound play prevented by browser policy:', e));
+        } catch (error) {
+            console.log('Sound notification not supported:', error);
+        }
+    }
+
+    // Add a new exit row to the table (for real-time updates)
+    function addNewExitRow(exitLog) {
+        console.log('ADMIN DASHBOARD: Adding new exit row to table:', exitLog);
+        
+        const tableBody = document.getElementById('exitLogsTableBody');
+        if (!tableBody) {
+            console.error('ADMIN DASHBOARD: Exit logs table body not found');
+            return;
+        }
+        
+        // Check if the exit log already exists in the table by exit time and student name
+        // This prevents duplicates when socket events fire multiple times
+        const existingRows = tableBody.querySelectorAll('tr');
+        for (let i = 0; i < existingRows.length; i++) {
+            const timeCell = existingRows[i].querySelector('td:nth-child(4)');
+            const nameCell = existingRows[i].querySelector('td:nth-child(2)');
+            
+            if (timeCell && nameCell) {
+                const existingTime = timeCell.getAttribute('data-time');
+                const existingName = nameCell.textContent.trim();
+                
+                if (existingTime === exitLog.exit_time && existingName === exitLog.student_name) {
+                    console.log('ADMIN DASHBOARD: Exit log already exists in table, not adding duplicate');
+                    return;
+                }
+            }
+        }
+        
+        // Create new row
+        const row = createExitLogRow(exitLog);
+        row.classList.add('new-exit-row');
+        
+        // Insert at the top of the table
+        if (tableBody.firstChild) {
+            tableBody.insertBefore(row, tableBody.firstChild);
+        } else {
+            tableBody.appendChild(row);
+        }
+        
+        // Remove empty row if it exists
+        const emptyRow = tableBody.querySelector('tr td[colspan="5"]');
+        if (emptyRow && emptyRow.parentNode) {
+            tableBody.removeChild(emptyRow.parentNode);
+        }
+        
+        // Remove the highlight class after animation
+        setTimeout(() => {
+            row.classList.remove('new-exit-row');
+        }, 3000);
+        
+        // Trim table to keep only most recent 50 items
+        const rows = tableBody.querySelectorAll('tr');
+        if (rows.length > 50) {
+            for (let i = 50; i < rows.length; i++) {
+                if (rows[i].parentNode) {
+                    rows[i].parentNode.removeChild(rows[i]);
+                }
+            }
+        }
+    }
+</script>
+{% endblock %}

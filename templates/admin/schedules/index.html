@@ -1,0 +1,166 @@
+{% extends 'admin/base.html' %}
+
+{% block title %}Class Schedules{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h3">Class Schedules</h1>
+    </div>
+
+    {% include 'admin/partials/flash_messages.html' %}
+
+    <div class="card" style="min-height: calc(100vh - 150px);">
+        <div class="card-header">
+            <h5 class="mb-3">Select Class Information</h5>
+            <form id="sectionSelectForm" method="GET" action="{{ url_for('view_schedule') }}">
+                <div class="row">
+                    <div class="col-md-3 mb-3">
+                        <label for="grade_level">Grade Level</label>
+                        <select id="grade_level" name="grade_level" class="form-control" required>
+                            <option value="">Select Grade Level</option>
+                            {% for grade in grade_levels %}
+                            <option value="{{ grade }}">Grade {{ grade }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label for="strand_id">Strand</label>
+                        <select id="strand_id" name="strand_id" class="form-control" required disabled>
+                            <option value="">Select Strand</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label for="section_id">Section</label>
+                        <select id="section_id" name="section_id" class="form-control" required disabled>
+                            <option value="">Select Section</option>
+                        </select>
+                    </div>
+                    <div class="col-md-1 mb-3 d-flex align-items-end">
+                        <button type="submit" class="btn btn-primary w-100" id="viewScheduleBtn" disabled>
+                            <i class="fas fa-calendar-alt mr-1"></i> View
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+        <div class="card-body text-center py-5">
+            <i class="fas fa-calendar-alt fa-4x text-muted mb-3"></i>
+            <h4>Select a class to view or create schedules</h4>
+            <p class="text-muted">Choose the grade level, strand, and section to continue</p>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Fetch strands when page loads
+    $(document).ready(function() {
+        // Load strands on page load
+        $.ajax({
+            url: '/api/strands',
+            type: 'GET',
+            success: function(data) {
+                console.log("Strands data:", data); // Add this for debugging
+                let options = '<option value="">Select Strand</option>';
+                if (data && data.length > 0) {
+                    data.forEach(function(strand) {
+                        options += `<option value="${strand.strand_id}">${strand.strand_name}</option>`;
+                    });
+                    $('#strand_id').html(options);
+                    // Enable strand dropdown after loading options
+                    $('#strand_id').prop('disabled', false);
+                } else {
+                    console.error("No strands returned from API");
+                }
+            },
+            error: function(xhr, status, error) {
+                console.error("Error fetching strands:", error);
+                console.error("Status:", status);
+                console.error("Response:", xhr.responseText);
+                alert("Failed to load strands. Please try again.");
+            }
+        });
+        
+        // Handle grade level change
+        $('#grade_level').change(function() {
+            const gradeLevel = $(this).val();
+            if (gradeLevel) {
+                // Enable strand dropdown
+                $('#strand_id').prop('disabled', false);
+            } else {
+                // Disable strand and section dropdowns
+                $('#strand_id').prop('disabled', true);
+                $('#section_id').prop('disabled', true);
+                $('#viewScheduleBtn').prop('disabled', true);
+            }
+        });
+        
+        // Handle strand change to load sections
+        $('#strand_id').change(function() {
+            const strandId = $(this).val();
+            const gradeLevel = $('#grade_level').val();
+            
+            if (strandId && gradeLevel) {
+                // Enable section dropdown
+                $('#section_id').prop('disabled', false);
+                
+                // Fetch sections for selected strand and grade level
+                $.ajax({
+                    url: `/api/sections?strand_id=${strandId}&grade_level=${gradeLevel}`,
+                    type: 'GET',
+                    success: function(data) {
+                        console.log("Sections data:", data); // Add this for debugging
+                        let options = '<option value="">Select Section</option>';
+                        if (data && data.length > 0) {
+                            data.forEach(function(section) {
+                                options += `<option value="${section.section_id}">${section.section_name}</option>`;
+                            });
+                        }
+                        $('#section_id').html(options);
+                    },
+                    error: function(xhr, status, error) {
+                        console.error("Error fetching sections:", error);
+                        console.error("Status:", status);
+                        console.error("Response:", xhr.responseText);
+                        alert("Failed to load sections. Please try again.");
+                    }
+                });
+            } else {
+                // Disable and reset section dropdown
+                $('#section_id').prop('disabled', true).html('<option value="">Select Section</option>');
+            }
+        });
+        
+        // Handle section change
+        $('#section_id').change(function() {
+            if ($(this).val()) {
+                // Enable view button when section is selected
+                $('#viewScheduleBtn').prop('disabled', false);
+            } else {
+                $('#viewScheduleBtn').prop('disabled', true);
+            }
+        });
+        
+        // Add form submission handler
+        $('#sectionSelectForm').submit(function(e) {
+            const sectionId = $('#section_id').val();
+            if (!sectionId) {
+                e.preventDefault();
+                alert('Please select a section first');
+                return false;
+            }
+            
+            // Log form submission for debugging
+            console.log('Form submitted with section_id:', sectionId);
+            
+            // Make sure the form action is correct
+            $(this).attr('action', '/schedules/view?section_id=' + sectionId);
+            
+            // Continue with form submission
+            return true;
+        });
+    });
+</script>
+{% endblock %}

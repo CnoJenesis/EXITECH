@@ -1,0 +1,390 @@
+{% extends 'admin/base.html' %}
+
+{% block title %}Class Schedule - {{ section.section_name }}{% endblock %}
+
+{% block styles %}
+<style>
+    .timetable-wrapper {
+        overflow-x: auto;
+    }
+    .timetable {
+        min-width: 100%;
+        border-collapse: collapse;
+    }
+    .timetable th, .timetable td {
+        border: 1px solid #dee2e6;
+        padding: 8px;
+        vertical-align: top;
+    }
+    .timetable th {
+        background-color: #f8f9fa;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+    }
+    .timetable th:first-child {
+        width: 100px;
+        position: sticky;
+        left: 0;
+        z-index: 20;
+    }
+    .timetable td:first-child {
+        background-color: #f8f9fa;
+        font-weight: 500;
+        position: sticky;
+        left: 0;
+        z-index: 5;
+    }
+    .schedule-item {
+        background-color: #e3f2fd;
+        border-radius: 4px;
+        padding: 8px;
+        margin-bottom: 4px;
+        border-left: 4px solid #2196f3;
+    }
+    .schedule-subject {
+        font-weight: bold;
+        margin-bottom: 4px;
+    }
+    .schedule-teacher {
+        font-size: 0.85rem;
+        color: #6c757d;
+    }
+    .add-schedule-btn {
+        color: #6c757d;
+        border: 2px dashed #dee2e6;
+        border-radius: 4px;
+        padding: 8px;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.2s;
+        height: 100%;
+        min-height: 80px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .add-schedule-btn:hover {
+        background-color: #f8f9fa;
+        border-color: #adb5bd;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h3 mb-1">Class Schedule</h1>
+            <p class="text-muted">
+                Grade {{ section.grade_level }} - {{ strand_info.strand_code }} {{ section.section_name }}
+            </p>
+        </div>
+        <div>
+            <a href="{{ url_for('schedules') }}" class="btn btn-outline-secondary mr-2">
+                <i class="fas fa-arrow-left"></i> Back
+            </a>
+            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addScheduleModal">
+                <i class="fas fa-plus"></i> Add Schedule
+            </button>
+        </div>
+    </div>
+
+    {% include 'admin/partials/flash_messages.html' %}
+
+    <div class="card">
+        <div class="card-body p-0">
+            <div class="timetable-wrapper">
+                <table class="timetable">
+                    <thead>
+                        <tr>
+                            <th>Time</th>
+                            {% for day in days_of_week %}
+                            <th>{{ day }}</th>
+                            {% endfor %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for time_slot in time_slots %}
+                        {% if not loop.last %}
+                        <tr>
+                            <td>{{ time_slot }} - {{ time_slots[loop.index] }}</td>
+                            {% for day in days_of_week %}
+                            <td>
+                                {% set time_slot_key = time_slot + ' - ' + time_slots[loop.index] %}
+                                {% if timetable[day][time_slot] and timetable[day][time_slot][0] %}
+                                <div class="schedule-item">
+                                    <div class="schedule-subject">{{ timetable[day][time_slot][0].subject_code }} - {{ timetable[day][time_slot][0].subject_name }}</div>
+                                    <div class="schedule-teacher">{{ timetable[day][time_slot][0].teacher_name }}</div>
+                                    <div class="mt-2">
+                                        <button class="btn btn-sm btn-outline-primary edit-schedule" 
+                                                data-id="{{ timetable[day][time_slot][0].schedule_id }}"
+                                                data-subject="{{ timetable[day][time_slot][0].subject_id }}"
+                                                data-teacher="{{ timetable[day][time_slot][0].teacher_id }}"
+                                                data-day="{{ day }}"
+                                                data-start="{{ timetable[day][time_slot][0].start_time }}"
+                                                data-end="{{ timetable[day][time_slot][0].end_time }}">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-danger delete-schedule"
+                                                data-id="{{ timetable[day][time_slot][0].schedule_id }}"
+                                                data-name="{{ timetable[day][time_slot][0].subject_code }}">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                {% else %}
+                                <div class="add-schedule-btn" data-day="{{ day }}" data-time="{{ time_slot }}">
+                                    <div>
+                                        <i class="fas fa-plus"></i><br>
+                                        <small>Add</small>
+                                    </div>
+                                </div>
+                                {% endif %}
+                            </td>
+                            {% endfor %}
+                        </tr>
+                        {% endif %}
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Schedule Modal -->
+<div class="modal fade" id="addScheduleModal" tabindex="-1" role="dialog" aria-labelledby="addScheduleModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="addScheduleModalLabel">Add Schedule</h5>
+                <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="addScheduleForm" method="POST" action="/schedules/add">
+                    <input type="hidden" name="section_id" value="{{ section.section_id }}">
+                    
+                    <div class="form-group">
+                        <label for="subject_id">Subject</label>
+                        <input type="text" name="subject_id" id="subject_id" class="form-control" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="teacher_id">Teacher</label>
+                        <input type="text" name="teacher_id" id="teacher_id" class="form-control" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="day_of_week">Day</label>
+                        <select name="day_of_week" id="day_of_week" class="form-control" required>
+                            <option value="">Select Day</option>
+                            {% for day in days_of_week %}
+                            <option value="{{ day }}">{{ day }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group col-md-6">
+                            <label for="time_start">Start Time</label>
+                            <select name="time_start" id="time_start" class="form-control" required>
+                                <option value="">Select Start Time</option>
+                                {% for time in time_slots %}
+                                <option value="{{ time }}">{{ time }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="form-group col-md-6">
+                            <label for="time_end">End Time</label>
+                            <select name="time_end" id="time_end" class="form-control" required>
+                                <option value="">Select End Time</option>
+                                {% for time in time_slots %}
+                                <option value="{{ time }}">{{ time }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="submit" form="addScheduleForm" class="btn btn-primary">Save Schedule</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Schedule Modal -->
+<div class="modal fade" id="editScheduleModal" tabindex="-1" role="dialog" aria-labelledby="editScheduleModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="editScheduleModalLabel">Edit Schedule</h5>
+                <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <form id="editScheduleForm" method="POST">
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="edit_subject_id">Subject</label>
+                        <input type="text" name="subject_id" id="edit_subject_id" class="form-control" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="edit_teacher_id">Teacher</label>
+                        <input type="text" name="teacher_id" id="edit_teacher_id" class="form-control" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="edit_day_of_week">Day</label>
+                        <select name="day_of_week" id="edit_day_of_week" class="form-control" required>
+                            <option value="">Select Day</option>
+                            {% for day in days_of_week %}
+                            <option value="{{ day }}">{{ day }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group col-md-6">
+                            <label for="edit_time_start">Start Time</label>
+                            <select name="time_start" id="edit_time_start" class="form-control" required>
+                                <option value="">Select Start Time</option>
+                                {% for time in time_slots %}
+                                <option value="{{ time }}">{{ time }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="form-group col-md-6">
+                            <label for="edit_time_end">End Time</label>
+                            <select name="time_end" id="edit_time_end" class="form-control" required>
+                                <option value="">Select End Time</option>
+                                {% for time in time_slots %}
+                                <option value="{{ time }}">{{ time }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Update Schedule</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteScheduleModal" tabindex="-1" role="dialog" aria-labelledby="deleteScheduleModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="deleteScheduleModalLabel">Confirm Deletion</h5>
+                <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                Are you sure you want to delete this schedule? This action cannot be undone.
+                <p class="font-weight-bold mt-2" id="scheduleToDelete"></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <form id="deleteScheduleForm" method="POST">
+                    <button type="submit" class="btn btn-danger">Delete</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    $(document).ready(function() {
+        // Quick add schedule from timetable cell
+        $('.add-schedule-btn').click(function() {
+            const day = $(this).data('day');
+            const time = $(this).data('time');
+            
+            // Set values in the add schedule modal
+            $('#day_of_week').val(day);
+            $('#time_start').val(time);
+            
+            // Calculate end time (assuming 1-hour slots)
+            const timeIndex = {{ time_slots|tojson }}.indexOf(time);
+            if (timeIndex < {{ time_slots|length }} - 1) {
+                $('#time_end').val({{ time_slots|tojson }}[timeIndex + 1]);
+            }
+            
+            // Open the modal
+            var addModal = new bootstrap.Modal(document.getElementById('addScheduleModal'));
+            addModal.show();
+        });
+        
+        // Handle edit schedule button click
+        $('.edit-schedule').click(function() {
+            const scheduleId = $(this).data('id');
+            const subjectId = $(this).data('subject');
+            const teacherId = $(this).data('teacher');
+            const day = $(this).data('day');
+            const timeStart = $(this).data('start');
+            const timeEnd = $(this).data('end');
+            
+            // Set form action
+            $('#editScheduleForm').attr('action', '/schedules/edit/' + scheduleId);
+            
+            // Set form values
+            $('#edit_subject_id').val(subjectId);
+            $('#edit_teacher_id').val(teacherId);
+            $('#edit_day_of_week').val(day);
+            $('#edit_time_start').val(timeStart);
+            $('#edit_time_end').val(timeEnd);
+            
+            // Open the modal
+            var editModal = new bootstrap.Modal(document.getElementById('editScheduleModal'));
+            editModal.show();
+        });
+        
+        // Handle delete schedule button click
+        $('.delete-schedule').click(function() {
+            const scheduleId = $(this).data('id');
+            const scheduleName = $(this).data('name');
+            
+            // Set delete form action and schedule name
+            $('#deleteScheduleForm').attr('action', '/schedules/delete/' + scheduleId);
+            $('#scheduleToDelete').text(scheduleName);
+            
+            // Open the modal
+            var deleteModal = new bootstrap.Modal(document.getElementById('deleteScheduleModal'));
+            deleteModal.show();
+        });
+        
+        // Validate time selection (end time should be after start time)
+        $('#time_start, #time_end, #edit_time_start, #edit_time_end').change(function() {
+            const formId = $(this).closest('form').attr('id');
+            const startSelector = formId === 'editScheduleForm' ? '#edit_time_start' : '#time_start';
+            const endSelector = formId === 'editScheduleForm' ? '#edit_time_end' : '#time_end';
+            
+            const startTime = $(startSelector).val();
+            const endTime = $(endSelector).val();
+            
+            if (startTime && endTime) {
+                const timeSlots = {{ time_slots|tojson }};
+                const startIndex = timeSlots.indexOf(startTime);
+                const endIndex = timeSlots.indexOf(endTime);
+                
+                if (endIndex <= startIndex) {
+                    alert('End time must be after start time');
+                    $(endSelector).val('');
+                }
+            }
+        });
+    });
+</script>
+{% endblock %}

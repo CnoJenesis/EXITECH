@@ -1,0 +1,1171 @@
+{% extends "admin/layout.html" %}
+
+{% block title %}Students{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Filter Section -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Filter Students</h3>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label for="filterGradeLevel">Grade Level</label>
+                                <select class="form-control" id="filterGradeLevel">
+                                    <option value="">All Grade Levels</option>
+                                    <option value="11">Grade 11</option>
+                                    <option value="12">Grade 12</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label for="filterStrand">Strand</label>
+                                <select class="form-control" id="filterStrand">
+                                    <option value="">All Strands</option>
+                                    {% for strand in strands %}
+                                    <option value="{{ strand.strand_id }}">{{ strand.strand_code }} - {{ strand.strand_name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label for="filterSection">Section</label>
+                                <select class="form-control" id="filterSection">
+                                    <option value="">All Sections</option>
+                                    {% for section in sections %}
+                                    <option value="{{ section.section_id }}">{{ section.section_name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Student Management</h3>
+                    <div class="card-tools">
+                        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addStudentModal">
+                            <i class="fas fa-plus"></i> Add Student
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <table class="table table-bordered table-striped" id="studentsTable">
+                        <thead>
+                            <tr>
+                                <th>ID Number</th>
+                                <th>Name</th>
+                                <th>Grade Level</th>
+                                <th>Section</th>
+                                <th>RFID UID</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% if students %}
+                                {% for student in students %}
+                                <tr>
+                                    <td>{{ student.id_number }}</td>
+                                    <td>
+                                        {% if student.profile_picture %}
+                                            <img src="{{ url_for('static', filename='uploads/students/' + student.profile_picture) }}" alt="Profile" class="profile-image-sm me-2">
+                                        {% else %}
+                                            <img src="{{ url_for('static', filename='img/default-profile.png') }}" alt="Profile" class="profile-image-sm me-2">
+                                        {% endif %}
+                                        {{ student.first_name }} {% if student.middle_initial %}{{ student.middle_initial }}. {% endif %}{{ student.last_name }}
+                                    </td>
+                                    <td>{{ student.grade_level }}</td>
+                                    <td>
+                                        {% if student.section_name %}
+                                            {% if student.strand_code %}{{ student.strand_code }} - {% endif %}{{ student.section_name }}
+                                        {% else %}
+                                            Not assigned
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ student.rfid_uid if student.rfid_uid else 'Not registered' }}</td>
+                                    <td>
+                                        <div class="btn-group">
+                                            <button type="button" class="btn btn-sm btn-info edit-btn" data-id="{{ student.student_id }}">
+                                                <i class="fas fa-edit"></i> Edit
+                                            </button>
+                                            <button type="button" class="btn btn-sm btn-danger delete-btn" data-id="{{ student.student_id }}" data-name="{{ student.first_name }} {{ student.last_name }}">
+                                                <i class="fas fa-trash"></i> Delete
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            {% else %}
+                                <tr>
+                                    <td colspan="6" class="text-center">No students found</td>
+                                </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Student Modal -->
+<div class="modal fade" id="addStudentModal" tabindex="-1" role="dialog" aria-labelledby="addStudentModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="addStudentModalLabel">Add Student</h5>
+                <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <form id="addStudentForm" enctype="multipart/form-data">
+                <div class="modal-body">
+                    <!-- RFID Scanner Section -->
+                    <div class="row mb-3">
+                        <div class="col-12">
+                            <div class="form-group">
+                                <label for="rfidUid">RFID UID</label>
+                                <div class="input-group">
+                                    <input type="text" class="form-control" id="rfidUid" name="rfid_uid" placeholder="RFID UID will appear here">
+                                    <div class="input-group-append">
+                                        <button type="button" class="btn btn-primary" id="scanRfidBtn">
+                                            <i class="fas fa-id-card"></i> SCAN RFID
+                                        </button>
+                                    </div>
+                                </div>
+                                <small class="form-text text-muted">Click "SCAN RFID" to scan a new RFID card</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="idNumber">ID Number</label>
+                                <input type="text" class="form-control" id="idNumber" name="id_number" required style="text-transform: uppercase;">
+                            </div>
+                            <div class="form-group">
+                                <label for="firstName">First Name</label>
+                                <input type="text" class="form-control" id="firstName" name="first_name" required style="text-transform: uppercase;">
+                            </div>
+                            <div class="form-group">
+                                <label for="middleInitial">Middle Initial</label>
+                                <input type="text" class="form-control" id="middleInitial" name="middle_initial" maxlength="1" style="text-transform: uppercase;">
+                            </div>
+                            <div class="form-group">
+                                <label for="lastName">Last Name</label>
+                                <input type="text" class="form-control" id="lastName" name="last_name" required style="text-transform: uppercase;">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="gradeLevel">Grade Level</label>
+                                <select class="form-control" id="gradeLevel" name="grade_level" required>
+                                    <option value="">Select Grade Level</option>
+                                    <option value="11">Grade 11</option>
+                                    <option value="12">Grade 12</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="strandId">Strand</label>
+                                <select class="form-control" id="strandId" name="strand_id">
+                                    <option value="">Select Strand</option>
+                                    {% for strand in strands %}
+                                    <option value="{{ strand.strand_id }}">{{ strand.strand_code }} - {{ strand.strand_name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="sectionId">Section</label>
+                                <select class="form-control" id="sectionId" name="section_id">
+                                    <option value="">Select Section</option>
+                                    {% for section in sections %}
+                                    <option value="{{ section.section_id }}">{{ section.section_name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="profilePicture">Profile Picture</label>
+                                <input type="file" class="form-control-file" id="profilePicture" name="profile_picture" accept="image/*">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Student</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Student Modal (Similar structure to Add Modal) -->
+<div class="modal fade" id="editStudentModal" tabindex="-1" role="dialog" aria-labelledby="editStudentModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="editStudentModalLabel">Edit Student</h5>
+                <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <form id="editStudentForm" enctype="multipart/form-data">
+                <input type="hidden" id="editStudentId" name="student_id">
+                <div class="modal-body">
+                    <!-- RFID Scanner Section -->
+                    <div class="row mb-3">
+                        <div class="col-12">
+                            <div class="form-group">
+                                <label for="editRfidUid">RFID UID</label>
+                                <div class="input-group">
+                                    <input type="text" class="form-control" id="editRfidUid" name="rfid_uid">
+                                    <div class="input-group-append">
+                                        <button type="button" class="btn btn-primary" id="editScanRfidBtn">
+                                            <i class="fas fa-id-card"></i> SCAN RFID
+                                        </button>
+                                    </div>
+                                </div>
+                                <small class="form-text text-muted">Click "SCAN RFID" to scan a new RFID card</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="editIdNumber">ID Number</label>
+                                <input type="text" class="form-control" id="editIdNumber" name="id_number" required style="text-transform: uppercase;">
+                            </div>
+                            <div class="form-group">
+                                <label for="editFirstName">First Name</label>
+                                <input type="text" class="form-control" id="editFirstName" name="first_name" required style="text-transform: uppercase;">
+                            </div>
+                            <div class="form-group">
+                                <label for="editMiddleInitial">Middle Initial</label>
+                                <input type="text" class="form-control" id="editMiddleInitial" name="middle_initial" maxlength="1" style="text-transform: uppercase;">
+                            </div>
+                            <div class="form-group">
+                                <label for="editLastName">Last Name</label>
+                                <input type="text" class="form-control" id="editLastName" name="last_name" required style="text-transform: uppercase;">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="editGradeLevel">Grade Level</label>
+                                <select class="form-control" id="editGradeLevel" name="grade_level" required>
+                                    <option value="">Select Grade Level</option>
+                                    <option value="11">Grade 11</option>
+                                    <option value="12">Grade 12</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="editStrandId">Strand</label>
+                                <select class="form-control" id="editStrandId" name="strand_id">
+                                    <option value="">Select Strand</option>
+                                    {% for strand in strands %}
+                                    <option value="{{ strand.strand_id }}">{{ strand.strand_code }} - {{ strand.strand_name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="editSectionId">Section</label>
+                                <select class="form-control" id="editSectionId" name="section_id">
+                                    <option value="">Select Section</option>
+                                    {% for section in sections %}
+                                    <option value="{{ section.section_id }}">{{ section.section_name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="editProfilePicture">Profile Picture</label>
+                                <input type="file" class="form-control-file" id="editProfilePicture" name="profile_picture" accept="image/*">
+                                <div id="currentProfilePicture" class="mt-2"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Update Student</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteStudentModal" tabindex="-1" role="dialog" aria-labelledby="deleteStudentModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="deleteStudentModalLabel">Delete Student</h5>
+                <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete <span id="deleteStudentName"></span>?</p>
+                <p class="text-danger">This action cannot be undone.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirmDeleteBtn">Delete</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block styles %}
+<style>
+    .profile-image-sm {
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        object-fit: cover;
+        margin-right: 8px; /* Ensure spacing even if me-2 class doesn't work */
+    }
+    
+    #currentProfilePicture img {
+        max-width: 100px;
+        max-height: 100px;
+        border-radius: 4px;
+    }
+    
+    /* RFID Scanning styles */
+    .rfid-scanning {
+        animation: pulse 1.5s infinite;
+    }
+    
+    @keyframes pulse {
+        0% {
+            background-color: #f8f9fa;
+        }
+        50% {
+            background-color: #e2f6ff;
+        }
+        100% {
+            background-color: #f8f9fa;
+        }
+    }
+    
+    .input-group .btn-primary {
+        background-color: #007bff;
+        border-color: #007bff;
+    }
+    
+    .input-group .btn-primary:hover {
+        background-color: #0069d9;
+        border-color: #0062cc;
+    }
+    
+    .input-group .btn-primary:focus {
+        box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.5);
+    }
+    
+    /* Loading overlay */
+    .overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(255, 255, 255, 0.7);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 10;
+    }
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+$(document).ready(function() {
+    // Initialize DataTable for better user experience
+    var studentsTable = $('#studentsTable').DataTable({
+        "responsive": true,
+        "lengthChange": true,
+        "autoWidth": false,
+        "pageLength": 10,
+        "lengthMenu": [[10, 25, 50, -1], [10, 25, 50, "All"]],
+        "order": [[1, 'asc']], // Sort by name (column 1) by default
+        "columnDefs": [
+            { "orderable": false, "targets": 5 } // Disable sorting on the Actions column
+        ]
+    });
+    
+    // Initialization for button handlers should go here
+    $('#addStudentForm')[0].reset(); // Reset form on page load
+    
+    // RFID Scanning Functionality
+    let scanningMode = false;
+    let scanTarget = null;
+    
+    // Function to show toast notifications
+    function showToast(title, message, type = 'info') {
+        // Create a unique ID for the toast
+        const toastId = 'toast-' + Date.now();
+        
+        // Create toast HTML
+        const toast = `
+            <div id="${toastId}" class="toast" role="alert" aria-live="assertive" aria-atomic="true" data-bs-delay="3000">
+                <div class="toast-header bg-${type} text-white">
+                    <strong class="me-auto">${title}</strong>
+                    <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+                </div>
+                <div class="toast-body">
+                    ${message}
+                </div>
+            </div>
+        `;
+        
+        // Append toast to the container
+        if (!$('#toast-container').length) {
+            $('body').append('<div id="toast-container" class="toast-container position-fixed bottom-0 end-0 p-3"></div>');
+        }
+        $('#toast-container').append(toast);
+        
+        // Show the toast
+        const toastEl = new bootstrap.Toast(document.getElementById(toastId));
+        toastEl.show();
+        
+        // Remove the toast after it's hidden
+        $(`#${toastId}`).on('hidden.bs.toast', function() {
+            $(this).remove();
+        });
+    }
+    
+    // Function to start RFID scanning
+    function startRfidScan(targetInputId) {
+        scanningMode = true;
+        scanTarget = targetInputId;
+        
+        // Show scanning status
+        $('#' + targetInputId).val('Scanning... Please enter RFID UID');
+        $('#' + targetInputId).removeClass('bg-light').addClass('rfid-scanning');
+        
+        // Use a simulated RFID input dialog since we don't have physical scanner
+        const rfidUid = prompt('Enter RFID UID (simulating scanner):', '');
+        
+        if (rfidUid) {
+            // Process the RFID input
+            processRfidInput(rfidUid, targetInputId);
+        } else {
+            // User cancelled
+            $('#' + targetInputId).val('');
+            $('#' + targetInputId).removeClass('rfid-scanning');
+            scanningMode = false;
+        }
+    }
+    
+    // Function to process RFID input
+    function processRfidInput(rfidUid, targetInputId) {
+        // Send the RFID UID to the server
+        $.ajax({
+            url: '/api/process-rfid',
+            type: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({ rfid_uid: rfidUid }),
+            success: function(response) {
+                if (response.status === 'success') {
+                    // Update the input field
+                    $('#' + targetInputId).val(rfidUid);
+                    $('#' + targetInputId).removeClass('rfid-scanning');
+                    scanningMode = false;
+                    
+                    // Now check for the scan
+                    checkForRfidScan(targetInputId);
+                } else {
+                    alert('Error processing RFID: ' + response.message);
+                    $('#' + targetInputId).val('');
+                    $('#' + targetInputId).removeClass('rfid-scanning');
+                    scanningMode = false;
+                }
+            },
+            error: function(xhr) {
+                let errorMsg = 'Error processing RFID';
+                if (xhr.responseJSON && xhr.responseJSON.message) {
+                    errorMsg = xhr.responseJSON.message;
+                }
+                alert(errorMsg);
+                $('#' + targetInputId).val('');
+                $('#' + targetInputId).removeClass('rfid-scanning');
+                scanningMode = false;
+            }
+        });
+    }
+    
+    // Function to check for RFID scans
+    function checkForRfidScan(targetInputId) {
+        if (!scanningMode && !targetInputId) return;
+        
+        // Use AJAX to check for RFID scans
+        $.ajax({
+            url: '/api/check-rfid-scan',
+            type: 'GET',
+            success: function(response) {
+                if (response.rfid_detected) {
+                    // RFID detected, update the input field
+                    const inputId = targetInputId || scanTarget;
+                    $('#' + inputId).val(response.rfid_uid);
+                    $('#' + inputId).removeClass('rfid-scanning');
+                    
+                    // Stop scanning
+                    scanningMode = false;
+                    
+                    // Display success message
+                    showToast('RFID Detected', 'RFID card detected: ' + response.rfid_uid, 'success');
+                } else if (scanningMode) {
+                    // Continue polling if still in scanning mode
+                    setTimeout(function() { checkForRfidScan(); }, 1000); // Check every second
+                }
+            },
+            error: function() {
+                if (scanningMode) {
+                    // Try again after a delay
+                    setTimeout(function() { checkForRfidScan(); }, 2000);
+                }
+            }
+        });
+    }
+    
+    // Handle Scan RFID button click in Add form
+    $('#scanRfidBtn').on('click', function() {
+        startRfidScan('rfidUid');
+    });
+    
+    // Handle Scan RFID button click in Edit form
+    $('#editScanRfidBtn').on('click', function() {
+        startRfidScan('editRfidUid');
+    });
+    
+    // Stop scanning if modal is closed
+    $('#addStudentModal, #editStudentModal').on('hidden.bs.modal', function() {
+        scanningMode = false;
+        $('#rfidUid, #editRfidUid').removeClass('rfid-scanning');
+    });
+    
+    // Handle student form submission
+    $('#addStudentForm').on('submit', function(e) {
+        e.preventDefault();
+        console.log("Student form submitted");
+        
+        // Create FormData object to handle file uploads
+        const formData = new FormData(this);
+        
+        // Get section_id and make sure we have strand_id
+        const sectionId = $('#sectionId').val();
+        const strandId = $('#strandId').val();
+        
+        // Log data for debugging
+        console.log("Section ID:", sectionId);
+        console.log("Strand ID:", strandId);
+        
+        // If section is selected but strand is not, add the strand_id
+        if (sectionId && !strandId) {
+            // Get the strand_id from the section's data
+            $.ajax({
+                url: `/api/sections?section_id=${sectionId}`,
+                type: 'GET',
+                async: false, // We need this to be synchronous
+                success: function(response) {
+                    if (response.status === 'success' && response.sections.length > 0) {
+                        const section = response.sections[0];
+                        if (section.strand_id) {
+                            console.log("Adding strand_id from section:", section.strand_id);
+                            formData.append('strand_id', section.strand_id);
+                        }
+                    }
+                }
+            });
+        }
+        
+        // Ensure all text inputs are capitalized
+        const textFields = ['id_number', 'first_name', 'middle_initial', 'last_name'];
+        textFields.forEach(field => {
+            const value = formData.get(field);
+            if (value) {
+                formData.set(field, value.toUpperCase());
+            }
+        });
+        
+        // Send data to server
+        $.ajax({
+            url: '/api/students/create',
+            type: 'POST',
+            data: formData,
+            contentType: false,
+            processData: false,
+            success: function(response) {
+                if (response.status === 'success') {
+                    // Show success message
+                    alert('Student added successfully!');
+                    
+                    // Close modal using Bootstrap 5 syntax
+                    var addModal = bootstrap.Modal.getInstance(document.getElementById('addStudentModal'));
+                    if (addModal) {
+                        addModal.hide();
+                    }
+                    
+                    // Refresh the student list instead of reloading the page
+                    applyStudentFilters();
+                } else {
+                    alert('Error: ' + response.message);
+                }
+            },
+            error: function(xhr) {
+                console.error("Error adding student:", xhr);
+                alert('Error: ' + (xhr.responseJSON ? xhr.responseJSON.message : 'Could not add student'));
+            }
+        });
+    });
+    
+    // Function to attach event handlers to dynamically created elements
+    function attachEventHandlers() {
+        console.log("Attaching event handlers to dynamic buttons");
+        
+        // Edit button click handler
+        $('.edit-btn').off('click').on('click', function(e) {
+            e.preventDefault();
+            const studentId = $(this).data('id');
+            console.log("Edit button clicked for student ID:", studentId);
+            
+            // Fetch and open edit modal with student data
+            $.ajax({
+                url: `/api/students/${studentId}`,
+                type: 'GET',
+                success: function(response) {
+                    if (response.status === 'success') {
+                        const student = response.student;
+                        console.log("Student data retrieved:", student);
+                        
+                        // Populate form fields
+                        $('#editStudentId').val(student.student_id);
+                        $('#editIdNumber').val(student.id_number);
+                        $('#editFirstName').val(student.first_name);
+                        $('#editMiddleInitial').val(student.middle_initial);
+                        $('#editLastName').val(student.last_name);
+                        $('#editRfidUid').val(student.rfid_uid);
+                        $('#editGradeLevel').val(student.grade_level);
+                        $('#editStrandId').val(student.strand_id);
+                        
+                        // Populate sections based on strand and grade level if needed
+                        if (student.strand_id && student.grade_level) {
+                            updateEditSections(student.strand_id, student.grade_level, student.section_id);
+                        } else {
+                            $('#editSectionId').val(student.section_id);
+                        }
+                        
+                        // Show profile picture if available
+                        if (student.profile_picture) {
+                            let imgSrc = student.profile_picture;
+                            if (!imgSrc.startsWith('/')) {
+                                imgSrc = '/static/uploads/students/' + imgSrc;
+                            }
+                            $('#currentProfilePicture').html(`<img src="${imgSrc}" alt="Current Profile Picture" class="img-thumbnail">`);
+                        } else {
+                            $('#currentProfilePicture').html('<p class="text-muted">No profile picture</p>');
+                        }
+                        
+                        // Show the modal (using Bootstrap 5 syntax)
+                        var editModal = new bootstrap.Modal(document.getElementById('editStudentModal'));
+                        editModal.show();
+                    } else {
+                        alert('Error: ' + response.message);
+                    }
+                },
+                error: function(xhr) {
+                    console.error("Error fetching student data:", xhr);
+                    alert('Error: ' + (xhr.responseJSON ? xhr.responseJSON.message : 'Could not fetch student data'));
+                }
+            });
+        });
+        
+        // Delete button click handler
+        $('.delete-btn').off('click').on('click', function(e) {
+            e.preventDefault();
+            const studentId = $(this).data('id');
+            const studentName = $(this).data('name');
+            console.log("Delete button clicked for student:", studentName, "ID:", studentId);
+            
+            $('#deleteStudentName').text(studentName);
+            $('#confirmDeleteBtn').data('id', studentId);
+            
+            // Show the modal (using Bootstrap 5 syntax)
+            var deleteModal = new bootstrap.Modal(document.getElementById('deleteStudentModal'));
+            deleteModal.show();
+        });
+    }
+    
+    // Update sections dropdown based on selected strand and grade level
+    function updateSections(strandId, gradeLevel) {
+        // Save current selection before clearing
+        const currentSectionId = $('#filterSection').val();
+        
+        // Clear the current options
+        $('#filterSection').empty().append('<option value="">All Sections</option>');
+        
+        // Prepare API endpoint - fetch sections based on available filters
+        let apiUrl = '/api/sections';
+        
+        // Add filters if they exist and they're not empty
+        let params = [];
+        if (gradeLevel && gradeLevel.trim()) {
+            params.push(`grade_level=${gradeLevel}`);
+        }
+        if (strandId && strandId.trim()) {
+            params.push(`strand_id=${strandId}`);
+        }
+        
+        // Append parameters to URL if any exist
+        if (params.length > 0) {
+            apiUrl += '?' + params.join('&');
+        }
+        
+        console.log(`Fetching sections from: ${apiUrl}, current section: ${currentSectionId}`);
+        
+        // Fetch the sections based on available filters
+        $.ajax({
+            url: apiUrl,
+            type: 'GET',
+            success: function(response) {
+                if (response.status === 'success') {
+                    const sections = response.sections;
+                    // Track unique section names to prevent duplicates
+                    const uniqueSections = new Map();
+                    
+                    sections.forEach(function(section) {
+                        // Use section_name as key to prevent duplicates
+                        if (!uniqueSections.has(section.section_name)) {
+                            uniqueSections.set(section.section_name, section);
+                        }
+                    });
+                    
+                    // Flag to check if current section is found in the new options
+                    let currentSectionFound = false;
+                    
+                    // Add unique sections to dropdown
+                    uniqueSections.forEach(function(section) {
+                        const isSelected = section.section_id == currentSectionId ? 'selected' : '';
+                        $('#filterSection').append(`<option value="${section.section_id}" ${isSelected}>${section.section_name}</option>`);
+                        
+                        if (section.section_id == currentSectionId) {
+                            currentSectionFound = true;
+                        }
+                    });
+                    
+                    // If current section wasn't found in the new options but we had a selection, 
+                    // add it back as an additional option
+                    if (currentSectionId && !currentSectionFound && currentSectionId !== '') {
+                        // Fetch the section info to get its name
+                        $.ajax({
+                            url: `/api/sections?section_id=${currentSectionId}`,
+                            type: 'GET',
+                            async: false,
+                            success: function(sectionResponse) {
+                                if (sectionResponse.status === 'success' && sectionResponse.sections.length > 0) {
+                                    const section = sectionResponse.sections[0];
+                                    $('#filterSection').append(`<option value="${section.section_id}" selected>${section.section_name}</option>`);
+                                }
+                            }
+                        });
+                    }
+                }
+            },
+            error: function(xhr) {
+                console.error("Error fetching sections:", xhr);
+            }
+        });
+    }
+    
+    // Update sections dropdown in edit form
+    function updateEditSections(strandId, gradeLevel, selectedSectionId) {
+        if (strandId && gradeLevel) {
+            $.ajax({
+                url: `/api/sections?strand_id=${strandId}&grade_level=${gradeLevel}`,
+                type: 'GET',
+                success: function(response) {
+                    if (response.status === 'success') {
+                        const sections = response.sections;
+                        let options = '<option value="">Select Section</option>';
+                        
+                        sections.forEach(function(section) {
+                            const selected = section.section_id == selectedSectionId ? 'selected' : '';
+                            options += `<option value="${section.section_id}" ${selected}>${section.section_name}</option>`;
+                        });
+                        
+                        $('#editSectionId').html(options);
+                    }
+                }
+            });
+        }
+    }
+    
+    // Filter sections based on selected strand and grade level in add form
+    $('#strandId, #gradeLevel').on('change', function() {
+        const strandId = $('#strandId').val();
+        const gradeLevel = $('#gradeLevel').val();
+        updateSections(strandId, gradeLevel);
+    });
+    
+    // Filter sections in edit form
+    $('#editStrandId, #editGradeLevel').on('change', function() {
+        const strandId = $('#editStrandId').val();
+        const gradeLevel = $('#editGradeLevel').val();
+        updateEditSections(strandId, gradeLevel);
+    });
+    
+    // Handle filter strand and grade level changes
+    $('#filterGradeLevel, #filterStrand').on('change', function() {
+        const strandId = $('#filterStrand').val();
+        const gradeLevel = $('#filterGradeLevel').val();
+        
+        // Update sections dropdown based on current filters
+        updateSections(strandId, gradeLevel);
+    });
+    
+    // Handle section filter change separately
+    $('#filterSection').on('change', function() {
+        applyStudentFilters();
+    });
+    
+    // Load initial student data
+    applyStudentFilters();
+
+    // Function to apply filters
+    function applyStudentFilters() {
+        const gradeLevel = $('#filterGradeLevel').val();
+        const strandId = $('#filterStrand').val();
+        const sectionId = $('#filterSection').val();
+        
+        console.log(`Applying filters - Grade: ${gradeLevel}, Strand: ${strandId}, Section: ${sectionId}`);
+        
+        // Show loading indicator
+        $('#studentsTable_wrapper').append('<div class="overlay"><i class="fas fa-2x fa-sync-alt fa-spin"></i></div>');
+        
+        // Build filter parameters
+        const filterParams = {};
+        
+        // If a specific section is selected, use that as the primary filter
+        // This will return all students from this section regardless of grade level
+        if (sectionId) {
+            filterParams.section_id = sectionId;
+        } else {
+            // Otherwise, apply grade level and strand filters
+            if (gradeLevel) filterParams.grade_level = gradeLevel;
+            if (strandId) filterParams.strand_id = strandId;
+        }
+        
+        console.log("Filter parameters:", filterParams);
+        
+        // Get all students based on filters
+        $.ajax({
+            url: '/api/students',
+            type: 'GET',
+            data: filterParams,
+            success: function(response) {
+                if (response.status === 'success') {
+                    // Clear existing table data
+                    studentsTable.clear();
+                    
+                    // Add filtered data
+                    if (response.students && response.students.length > 0) {
+                        response.students.forEach(function(student) {
+                            const profileImg = student.profile_picture ? 
+                                `<img src="${student.profile_picture}" alt="Profile" class="profile-image-sm me-2">` : 
+                                `<img src="/static/img/default-profile.png" alt="Profile" class="profile-image-sm me-2">`;
+                            
+                            const middleInitial = student.middle_initial ? `${student.middle_initial}. ` : '';
+                            const fullName = `${profileImg}${student.first_name} ${middleInitial}${student.last_name}`;
+                            
+                            let sectionText = 'Not assigned';
+                            if (student.section_name) {
+                                sectionText = student.strand_code ? 
+                                    `${student.strand_code} - ${student.section_name}` : 
+                                    student.section_name;
+                            }
+                            
+                            const rfidText = student.rfid_uid ? student.rfid_uid : 'Not registered';
+                            
+                            const actions = `
+                                <div class="btn-group">
+                                    <button type="button" class="btn btn-sm btn-info edit-btn" data-id="${student.student_id}">
+                                        <i class="fas fa-edit"></i> Edit
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-danger delete-btn" data-id="${student.student_id}" data-name="${student.first_name} ${student.last_name}">
+                                        <i class="fas fa-trash"></i> Delete
+                                    </button>
+                                </div>
+                            `;
+                            
+                            studentsTable.row.add([
+                                student.id_number,
+                                fullName,
+                                student.grade_level,
+                                sectionText,
+                                rfidText,
+                                actions
+                            ]);
+                        });
+                        
+                        // Redraw the table and adjust to show more rows
+                        studentsTable.page.len(25).draw(); // Increase page length
+                        
+                        // Show status message with count
+                        const statusMsg = `Showing ${response.students.length} student(s)`;
+                        if (!$('#filterStatus').length) {
+                            $('#studentsTable_wrapper').prepend(`<div id="filterStatus" class="alert alert-info mb-3">${statusMsg}</div>`);
+                        } else {
+                            $('#filterStatus').text(statusMsg).show();
+                        }
+                        
+                        // Reattach event handlers to the newly added buttons
+                        attachEventHandlers();
+                    } else {
+                        // No students found
+                        studentsTable.draw();
+                        
+                        // Show no results message
+                        if (!$('#filterStatus').length) {
+                            $('#studentsTable_wrapper').prepend(`<div id="filterStatus" class="alert alert-warning mb-3">No students match the selected filters</div>`);
+                        } else {
+                            $('#filterStatus').text('No students match the selected filters').removeClass('alert-info').addClass('alert-warning').show();
+                        }
+                    }
+                } else {
+                    alert('Error: ' + response.message);
+                }
+                
+                // Remove loading indicator
+                $('.overlay').remove();
+                
+                // Auto-scroll to table
+                $('html, body').animate({
+                    scrollTop: $('#studentsTable_wrapper').offset().top - 100
+                }, 200);
+            },
+            error: function(xhr) {
+                // Log the error
+                console.error("Error fetching students:", xhr);
+                alert('Error: ' + (xhr.responseJSON ? xhr.responseJSON.message : 'Could not fetch students'));
+                // Remove loading indicator
+                $('.overlay').remove();
+            }
+        });
+    }
+
+    // After all the other event handlers, add back these form handlers
+    
+    // Handle edit form submission
+    $('#editStudentForm').on('submit', function(e) {
+        e.preventDefault();
+        
+        const studentId = $('#editStudentId').val();
+        const formData = new FormData(this);
+        
+        // Get section_id and make sure we have strand_id
+        const sectionId = $('#editSectionId').val();
+        const strandId = $('#editStrandId').val();
+        
+        // Log data for debugging
+        console.log("Edit form - Section ID:", sectionId);
+        console.log("Edit form - Strand ID:", strandId);
+        
+        // If section is selected but strand is not, add the strand_id
+        if (sectionId && !strandId) {
+            // Get the strand_id from the section's data
+            $.ajax({
+                url: `/api/sections?section_id=${sectionId}`,
+                type: 'GET',
+                async: false, // We need this to be synchronous
+                success: function(response) {
+                    if (response.status === 'success' && response.sections.length > 0) {
+                        const section = response.sections[0];
+                        if (section.strand_id) {
+                            console.log("Adding strand_id from section for edit:", section.strand_id);
+                            formData.append('strand_id', section.strand_id);
+                        }
+                    }
+                }
+            });
+        }
+        
+        // Ensure all text inputs are capitalized
+        const textFields = ['id_number', 'first_name', 'middle_initial', 'last_name'];
+        textFields.forEach(field => {
+            const value = formData.get(field);
+            if (value) {
+                formData.set(field, value.toUpperCase());
+            }
+        });
+        
+        $.ajax({
+            url: `/api/students/${studentId}/update`,
+            type: 'POST',
+            data: formData,
+            contentType: false,
+            processData: false,
+            success: function(response) {
+                if (response.status === 'success') {
+                    alert('Student updated successfully!');
+                    var editModal = bootstrap.Modal.getInstance(document.getElementById('editStudentModal'));
+                    if (editModal) {
+                        editModal.hide();
+                    }
+                    // Refresh the student list
+                    applyStudentFilters();
+                } else {
+                    alert('Error: ' + response.message);
+                }
+            },
+            error: function(xhr) {
+                console.error("Error updating student:", xhr);
+                alert('Error: ' + (xhr.responseJSON ? xhr.responseJSON.message : 'Could not update student'));
+            }
+        });
+    });
+
+    // Handle delete confirmation
+    $('#confirmDeleteBtn').off('click').on('click', function() {
+        const studentId = $(this).data('id');
+        
+        console.log("Confirming delete for student ID:", studentId);
+        
+        $.ajax({
+            url: `/api/students/${studentId}/delete`,
+            type: 'DELETE',
+            success: function(response) {
+                if (response.status === 'success') {
+                    showToast('Success', 'Student deleted successfully!', 'success');
+                    var deleteModal = bootstrap.Modal.getInstance(document.getElementById('deleteStudentModal'));
+                    if (deleteModal) {
+                        deleteModal.hide();
+                    }
+                    // Refresh the student list
+                    applyStudentFilters();
+                } else {
+                    showToast('Error', response.message || 'Failed to delete student', 'danger');
+                }
+            },
+            error: function(xhr) {
+                console.error("Error deleting student:", xhr);
+                showToast('Error', xhr.responseJSON ? xhr.responseJSON.message : 'Could not delete student', 'danger');
+            }
+        });
+    });
+
+    // Update strand based on section selection in add form
+    $('#sectionId').on('change', function() {
+        const sectionId = $(this).val();
+        if (sectionId) {
+            $.ajax({
+                url: `/api/sections?section_id=${sectionId}`,
+                type: 'GET',
+                success: function(response) {
+                    if (response.status === 'success' && response.sections.length > 0) {
+                        const section = response.sections[0];
+                        if (section.strand_id) {
+                            // Update the strand dropdown
+                            $('#strandId').val(section.strand_id);
+                        }
+                    }
+                }
+            });
+        }
+    });
+
+    // Update strand based on section selection in edit form
+    $('#editSectionId').on('change', function() {
+        const sectionId = $(this).val();
+        if (sectionId) {
+            $.ajax({
+                url: `/api/sections?section_id=${sectionId}`,
+                type: 'GET',
+                success: function(response) {
+                    if (response.status === 'success' && response.sections.length > 0) {
+                        const section = response.sections[0];
+                        if (section.strand_id) {
+                            // Update the strand dropdown
+                            $('#editStrandId').val(section.strand_id);
+                        }
+                    }
+                }
+            });
+        }
+    });
+
+    // Handle Delete Student button click
+    $(document).on('click', '.delete-student-btn', function() {
+        const studentId = $(this).data('id');
+        const studentName = $(this).data('name');
+        
+        console.log(`Delete button clicked for student ${studentId} (${studentName})`);
+        
+        // Set student ID in delete confirmation modal
+        $('#confirmDeleteStudentId').val(studentId);
+        $('#studentToDeleteName').text(studentName);
+        
+        // Show the modal
+        var deleteModal = new bootstrap.Modal(document.getElementById('deleteStudentModal'));
+        deleteModal.show();
+    });
+
+    // Handle Confirm Delete button click
+    $(document).on('click', '#confirmDeleteStudent', function() {
+        const studentId = $('#confirmDeleteStudentId').val();
+        
+        console.log(`Confirming deletion of student ${studentId}`);
+        
+        if (!studentId) {
+            console.error("No student ID found for deletion");
+            return;
+        }
+        
+        // Send DELETE request to the API
+        $.ajax({
+            url: `/api/students/${studentId}/delete`,
+            type: 'DELETE',
+            success: function(response) {
+                if (response.status === 'success') {
+                    console.log(`Student ${studentId} deleted successfully`);
+                    
+                    // Close the modal
+                    var deleteModal = bootstrap.Modal.getInstance(document.getElementById('deleteStudentModal'));
+                    if (deleteModal) {
+                        deleteModal.hide();
+                    }
+                    
+                    // Remove the row from the table
+                    $(`tr[data-student-id="${studentId}"]`).remove();
+                    
+                    // Show success message
+                    alert('Student deleted successfully');
+                    
+                    // Reload the page to refresh the student list
+                    window.location.reload();
+                } else {
+                    alert('Failed to delete student: ' + response.message);
+                }
+            },
+            error: function(xhr) {
+                console.error('Error deleting student:', xhr.responseText);
+                alert('Error: ' + (xhr.responseJSON ? xhr.responseJSON.message : 'Could not delete student'));
+            }
+        });
+    });
+});
+</script>
+{% endblock %}

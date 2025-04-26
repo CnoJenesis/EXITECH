@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Student ID Layout</title>
+    <style>
+        .id-card {
+            width: 320px;
+            height: 200px;
+            background: #fff;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            padding: 20px;
+            margin: 20px auto;
+            font-family: Arial, sans-serif;
+            position: relative;
+            border: 1px solid #ddd;
+        }
+
+        .id-header {
+            text-align: center;
+            margin-bottom: 15px;
+            border-bottom: 2px solid #1a5f7a;
+            padding-bottom: 10px;
+        }
+
+        .school-name {
+            font-size: 16px;
+            font-weight: bold;
+            color: #1a5f7a;
+            margin: 0;
+        }
+
+        .id-content {
+            display: flex;
+            gap: 15px;
+        }
+
+        .photo-section {
+            width: 100px;
+            height: 100px;
+            border: 2px solid #1a5f7a;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+
+        .photo-section img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .info-section {
+            flex: 1;
+        }
+
+        .info-item {
+            margin-bottom: 8px;
+        }
+
+        .info-label {
+            font-size: 10px;
+            color: #666;
+            text-transform: uppercase;
+            margin-bottom: 2px;
+        }
+
+        .info-value {
+            font-size: 14px;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .id-footer {
+            position: absolute;
+            bottom: 10px;
+            left: 20px;
+            right: 20px;
+            text-align: center;
+            font-size: 12px;
+            color: #666;
+        }
+
+        .school-logo {
+            width: 40px;
+            height: 40px;
+            margin-bottom: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div id="scan-prompt" class="text-center mb-4">
+        <h2>Please scan your ID card</h2>
+        <p class="text-muted">Place your ID card on the scanner</p>
+    </div>
+
+    <div class="id-card" style="display: none;">
+        <div class="id-header">
+            <img src="/static/img/school-logo.png" alt="School Logo" class="school-logo">
+            <p class="school-name">EXITECH SENIOR HIGH SCHOOL</p>
+        </div>
+        
+        <div class="id-content">
+            <div class="photo-section">
+                <img src="/static/img/default-profile.png" alt="Student Photo" id="student-photo">
+            </div>
+            
+            <div class="info-section">
+                <div class="info-item">
+                    <div class="info-label">ID Number</div>
+                    <div class="info-value student-id"></div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">Name</div>
+                    <div class="info-value student-name"></div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">Grade & Section</div>
+                    <div class="info-value student-section"></div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="id-footer">
+            School Year 2023-2024
+        </div>
+    </div>
+
+    <!-- Add jQuery -->
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    
+    <script>
+        $(document).ready(function() {
+            let rfidBuffer = '';
+            
+            $(document).on('keypress', function(e) {
+                const char = String.fromCharCode(e.which);
+                if (/[0-9]/.test(char)) {
+                    rfidBuffer += char;
+                    if (rfidBuffer.length === 10) {
+                        processRfid(rfidBuffer);
+                        rfidBuffer = '';
+                    }
+                } else {
+                    rfidBuffer = '';
+                }
+                if (e.which === 13 || rfidBuffer.length > 10) {
+                    rfidBuffer = '';
+                }
+            });
+
+            function processRfid(rfid) {
+                $.ajax({
+                    url: '/api/process-exit',
+                    type: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify({ rfid_uid: rfid.toString().trim() }),
+                    success: function(response) {
+                        if (response.status === 'success') {
+                            displayStudentInfo(response.student);
+                            $('#scan-prompt').hide();
+                            $('.id-card').show();
+                        } else {
+                            alert('Student not found');
+                        }
+                    },
+                    error: function() {
+                        alert('Error processing request');
+                    }
+                });
+            }
+
+            function displayStudentInfo(student) {
+                $('.student-id').text(student.id_number);
+                $('.student-name').text(student.name.toUpperCase());
+                $('.student-section').text(student.strand + ' ' + student.grade_level + ' - ' + student.section);
+                
+                if (student.profile_picture) {
+                    const profilePicture = student.profile_picture.split('/').pop();
+                    $('#student-photo').attr('src', `/static/img/${profilePicture}`);
+                } else {
+                    $('#student-photo').attr('src', '/static/img/default-profile.png');
+                }
+            }
+        });
+    </script>
+</body>
+</html>

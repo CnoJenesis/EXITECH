@@ -1,0 +1,82 @@
+{% extends "admin/layout.html" %}
+
+{% block title %}Settings{% endblock %}
+
+{% block content %}
+<div class="container my-4">
+    <div class="row">
+        <div class="col-lg-8 mx-auto">
+            <div class="card shadow mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="fas fa-key me-2"></i>Change Password</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('settings') }}">
+                        <div class="mb-3">
+                            <label for="current_password" class="form-label">Current Password</label>
+                            <input type="password" class="form-control" id="current_password" name="current_password" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="new_password" class="form-label">New Password</label>
+                            <input type="password" class="form-control" id="new_password" name="new_password" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="confirm_password" class="form-label">Confirm New Password</label>
+                            <input type="password" class="form-control" id="confirm_password" name="confirm_password" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Change Password</button>
+                    </form>
+                </div>
+            </div>
+            
+            <div class="card shadow">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="mb-0"><i class="fas fa-trash-alt me-2"></i>Clear System Logs</h5>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        <strong>Warning:</strong> Clearing logs will permanently delete all exit records from the system. This action cannot be undone.
+                    </div>
+                    <form id="clearLogsForm" method="POST" action="{{ url_for('clear_logs') }}">
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="checkbox" id="confirmClear" required>
+                            <label class="form-check-label" for="confirmClear">
+                                I understand that this action is irreversible and will remove all exit log data
+                            </label>
+                        </div>
+                        <button type="button" class="btn btn-danger" id="clearLogsBtn" disabled>Clear All Logs</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    $(document).ready(function() {
+        // Enable/disable clear logs button based on checkbox
+        $('#confirmClear').change(function() {
+            $('#clearLogsBtn').prop('disabled', !this.checked);
+        });
+        
+        // Confirmation dialog for clearing logs
+        $('#clearLogsBtn').click(function() {
+            if (confirm('Are you absolutely sure you want to clear all exit logs from the system? This action cannot be undone.')) {
+                $('#clearLogsForm').submit();
+            }
+        });
+        
+        // Password validation
+        $('#new_password, #confirm_password').on('keyup', function() {
+            if ($('#new_password').val() == $('#confirm_password').val()) {
+                $('#confirm_password').removeClass('is-invalid').addClass('is-valid');
+            } else {
+                $('#confirm_password').removeClass('is-valid').addClass('is-invalid');
+            }
+        });
+    });
+</script>
+{% endblock %} 
